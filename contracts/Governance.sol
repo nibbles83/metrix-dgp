@@ -8,7 +8,6 @@ contract Governance {
     // events
     event NewCollateralProposal(uint256 amount); // Emitted when a new proposal to change the collateral is made
     event CollateralProposalPassed(uint256 amount); // Emitted when a new proposal to change the collateral is passed
-
     // governors
     struct Governor {
         uint256 blockHeight;
@@ -188,7 +187,7 @@ contract Governance {
             collateralProposal.onVote = true; // put proposal on vote, no changes until vote is setteled or removed
             collateralProposal.proposal = newCollateral.mul(1 ether); // set new proposal for vote
             collateralProposal.proposalHeight = block.number; // set new proposal initial height
-            collateralProposal.votes.length = 0; // clear votes
+            delete collateralProposal.votes; // clear votes
             collateralProposal.votes.push(msg.sender); // add sender vote
             emit NewCollateralProposal(newCollateral.mul(1 ether)); // alert listeners
         } else if (collateralProposal.proposal == newCollateral) {
@@ -215,7 +214,7 @@ contract Governance {
 
     function clearCollateralProposal() private {
         collateralProposal.proposal = 0; // clear current proposal address
-        collateralProposal.votes.length = 0; // clear votes
+        delete collateralProposal.votes; // clear votes
         collateralProposal.proposalHeight = 0; // clear proposal height
         collateralProposal.onVote = false; // open submission
     }
