@@ -1,5 +1,5 @@
-pragma solidity ^0.6.1;
-import "./imports/SafeMath.sol";
+pragma solidity ^0.4.8;
+import "./SafeMath.sol";
 
 contract Governance {
     // imports
@@ -18,7 +18,7 @@ contract Governance {
 
     uint256 private _governorCount = 0;
     uint256 private _maximumGovernors = 2000;
-    uint256 public _requiredCollateral = 10 ether;
+    uint256 private _requiredCollateral = 1000000000;
     uint256 private _blocksBeforeUnenroll = 10;
     uint256 private _blockBeforeMatureGovernor = 10;
     mapping(address => Governor) public governors;
@@ -36,7 +36,7 @@ contract Governance {
 
     // rewards
     uint256 private _rewardBlockInterval = 10;
-    uint256 private _reward = 1 ether;
+    uint256 private _reward = 10000000;
 
     // ------------------------------
     // ----- GOVERNANCE SYSTEM ------
@@ -45,6 +45,11 @@ contract Governance {
     // get total governor funds
     function balance() public view returns (uint256) {
         return address(this).balance;
+    }
+
+    // get total governor funds
+    function requiredCollateral() public view returns (uint256) {
+        return _requiredCollateral;
     }
 
     // enroll an address to be a governor
@@ -70,7 +75,7 @@ contract Governance {
             // address is a not already a governor. collateral must be exact
             require(
                 msg.value == _requiredCollateral,
-                "new collateral must be exact"
+                "New collateral must be exact"
             );
             // add governor
             governors[msg.sender] = Governor({
@@ -86,7 +91,7 @@ contract Governance {
 
     // unenroll as a governor
     // this will refund the addresses collateral
-    function unenroll(bool force) public returns (bool) {
+    function unenroll(bool force) public {
         // check if a governor
         require(
             governors[msg.sender].blockHeight > 0,
@@ -96,11 +101,10 @@ contract Governance {
         uint256 enrolledAt = governors[msg.sender].blockHeight +
             _blocksBeforeUnenroll;
         require(block.number > enrolledAt, "Too early to unenroll");
+        uint256 refund = 0;
         if (!force && governors[msg.sender].collateral > _requiredCollateral) {
             // if the required collateral has changed allow it to be reduce without unenrolling
-            uint256 refund = governors[msg.sender].collateral.sub(
-                _requiredCollateral
-            );
+            refund = governors[msg.sender].collateral.sub(_requiredCollateral);
             // safety check balance
             require(
                 address(this).balance >= refund,
@@ -110,19 +114,12 @@ contract Governance {
             governors[msg.sender].collateral = _requiredCollateral;
             governors[msg.sender].blockHeight = block.number;
             // send refund
-            (bool success, ) = msg.sender.call.value(refund)("");
-            if (!success) {
-                governors[msg.sender].collateral = governors[msg.sender]
-                    .collateral
-                    .add(refund);
-                return false;
-            } else {
-                governors[msg.sender].lastReward = 0;
-                return true;
-            }
+            msg.sender.transfer(refund);
+            // rest last reward
+            governors[msg.sender].lastReward = 0;
         } else {
             // unenroll the governor
-            uint256 refund = governors[msg.sender].collateral;
+            refund = governors[msg.sender].collateral;
             uint256 addressIndex = governors[msg.sender].addressIndex;
             // safety check balance
             require(
@@ -134,20 +131,7 @@ contract Governance {
             _governorCount--;
             delete governorAddresses[addressIndex];
             // refund
-            (bool success, ) = msg.sender.call.value(refund)("");
-            if (!success) {
-                governors[msg.sender] = Governor({
-                    collateral: refund,
-                    blockHeight: block.number,
-                    lastReward: 0,
-                    addressIndex: _governorCount
-                });
-                _governorCount++;
-                governorAddresses.push(msg.sender);
-                return false;
-            } else {
-                return true;
-            }
+            msg.sender.transfer(refund);
         }
     }
 
@@ -185,11 +169,11 @@ contract Governance {
         // check a vote isn't active
         if (!collateralProposal.onVote) {
             collateralProposal.onVote = true; // put proposal on vote, no changes until vote is setteled or removed
-            collateralProposal.proposal = newCollateral.mul(1 ether); // set new proposal for vote
+            collateralProposal.proposal = newCollateral; // set new proposal for vote
             collateralProposal.proposalHeight = block.number; // set new proposal initial height
             delete collateralProposal.votes; // clear votes
             collateralProposal.votes.push(msg.sender); // add sender vote
-            emit NewCollateralProposal(newCollateral.mul(1 ether)); // alert listeners
+            emit NewCollateralProposal(newCollateral); // alert listeners
         } else if (collateralProposal.proposal == newCollateral) {
             require(!alreadyVoted(), "Governor has already voted"); // cannot vote twice
             collateralProposal.votes.push(msg.sender); // add sender vote
@@ -204,7 +188,7 @@ contract Governance {
             // check if vote has passed a simple majority (51%)
             if (collateralProposal.votes.length >= (_governorCount / 2 + 1)) {
                 // update collateral
-                _requiredCollateral = newCollateral.mul(1 ether);
+                _requiredCollateral = newCollateral;
                 // clear proposal
                 clearCollateralProposal();
                 emit CollateralProposalPassed(_requiredCollateral); // alert listeners
@@ -231,24 +215,20 @@ contract Governance {
     // -------- REWARD SYSTEM -------
     // ------------------------------
 
-    function rewardGovernor() public payable returns (bool) {
+    function hasGovernorToReward() public view returns (bool) {
+        address winner = selectWinner();
+        return winner != address(0);
+    }
+
+    function rewardGovernor() public payable {
         // amount must be the equal to the reward amount
         require(msg.value == _reward, "Rewards must be exact");
         // select a winner
         address winner = selectWinner();
-        if (winner == address(0)) {
-            return false;
-        }
+        require(winner != address(0), "No winner could be determined");
         // pay governor
-        uint256 lastReward = governors[winner].lastReward;
         governors[winner].lastReward = block.number;
-        (bool success, ) = address(uint160(winner)).call.value(_reward)("");
-        if (!success) {
-            governors[winner].lastReward = lastReward;
-            return false;
-        } else {
-            return true;
-        }
+        address(uint160(winner)).transfer(_reward);
     }
 
     function selectWinner() private view returns (address winner) {

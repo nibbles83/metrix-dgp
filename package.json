@@ -1,0 +1,17 @@
+{
+    "name": "metrix-dgp",
+    "version": "1.0.0",
+    "main": "test/index.js",
+    "license": "MIT",
+    "scripts": {
+        "test": "mocha --timeout 5000"
+    },
+    "dependencies": {
+        "big.js": "^5.2.2",
+        "chai": "^4.2.0",
+        "fs-extra": "^8.1.0",
+        "mocha": "^7.0.1",
+        "qtumjs": "^1.8.1",
+        "solc": "0.4.26"
+    }
+}
