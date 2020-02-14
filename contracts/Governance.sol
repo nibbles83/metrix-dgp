@@ -1,4 +1,4 @@
-pragma solidity ^0.4.8;
+pragma solidity ^0.4.26;
 import "./SafeMath.sol";
 
 contract Governance {
@@ -6,37 +6,44 @@ contract Governance {
     using SafeMath for uint256;
 
     // events
-    event NewCollateralProposal(uint256 amount); // Emitted when a new proposal to change the collateral is made
-    event CollateralProposalPassed(uint256 amount); // Emitted when a new proposal to change the collateral is passed
+    event NewProposal(ProposalType proposalType, uint256 amount); // Emitted when a new proposal is made
+    event ProposalPassed(ProposalType proposalType, uint256 amount); // Emitted when a new proposal is passed
+
     // governors
     struct Governor {
-        uint256 blockHeight;
-        uint256 collateral;
-        uint256 lastReward;
-        uint256 addressIndex;
+        uint256 blockHeight; // enrollment block height
+        uint256 lastPing; // last ping block
+        uint256 collateral; // contract held collateral
+        uint256 lastReward; // last block governor was rewarded
+        uint16 addressIndex; // position in the address index array
     }
 
-    uint256 private _governorCount = 0;
-    uint256 private _maximumGovernors = 2000;
-    uint256 private _requiredCollateral = 1000000000;
-    uint256 private _blocksBeforeUnenroll = 10;
-    uint256 private _blockBeforeMatureGovernor = 10;
+    uint16 private _governorCount = 0;
+    uint16 private _maximumGovernors = 2000;
+    uint256 private _requiredCollateral = 10E8;
+    uint16 private _blocksBeforeUnenroll = 10;
+    uint16 private _blockBeforeMatureGovernor = 10;
     mapping(address => Governor) public governors;
     address[] governorAddresses;
 
-    // collateral adjustment
-    struct CollateralProposal {
+    // proposals
+    enum ProposalType {NONE, COLLATERAL, BUDGETFEE}
+    struct Proposal {
         bool onVote;
         address[] votes;
-        uint256 proposal;
+        uint256 proposalAmount;
         uint256 proposalHeight;
+        ProposalType proposalType;
     }
-    uint256 private _proposalExpiryBlocks = 5;
-    CollateralProposal public collateralProposal;
+    uint16 private _proposalExpiryBlocks = 5;
+    Proposal public proposal;
+
+    // budget
+    uint256 private _budgetProposalFee = 1E8;
 
     // rewards
-    uint256 private _rewardBlockInterval = 10;
-    uint256 private _reward = 10000000;
+    uint16 private _rewardBlockInterval = 10;
+    uint256 private _reward = 1E8;
 
     // ------------------------------
     // ----- GOVERNANCE SYSTEM ------
@@ -47,9 +54,26 @@ contract Governance {
         return address(this).balance;
     }
 
-    // get total governor funds
+    // get required governor collateral
     function requiredCollateral() public view returns (uint256) {
         return _requiredCollateral;
+    }
+
+    // get total number of governors
+    function governorCount() public view returns (uint16) {
+        return _governorCount;
+    }
+
+    function ping() public {
+        // check if a governor
+        require(
+            governors[msg.sender].blockHeight > 0,
+            "Must be a governor to unenroll"
+        );
+        // check if governor is valid
+        require(isValidGovernor(msg.sender), "Governor is not currenlty valid");
+        // update ping
+        governors[msg.sender].lastPing = block.number;
     }
 
     // enroll an address to be a governor
@@ -70,8 +94,14 @@ contract Governance {
             );
             governors[msg.sender].collateral = _requiredCollateral;
             governors[msg.sender].blockHeight = block.number;
+            governors[msg.sender].lastPing = block.number;
             governors[msg.sender].lastReward = 0;
         } else {
+            // haven't reached maximum governors
+            require(
+                _governorCount < _maximumGovernors,
+                "The maximum number of governors has been reached"
+            );
             // address is a not already a governor. collateral must be exact
             require(
                 msg.value == _requiredCollateral,
@@ -81,6 +111,7 @@ contract Governance {
             governors[msg.sender] = Governor({
                 collateral: _requiredCollateral,
                 blockHeight: block.number,
+                lastPing: block.number,
                 lastReward: 0,
                 addressIndex: _governorCount
             });
@@ -113,6 +144,7 @@ contract Governance {
             // update governor
             governors[msg.sender].collateral = _requiredCollateral;
             governors[msg.sender].blockHeight = block.number;
+            governors[msg.sender].lastPing = block.number;
             // send refund
             msg.sender.transfer(refund);
             // rest last reward
@@ -120,7 +152,7 @@ contract Governance {
         } else {
             // unenroll the governor
             refund = governors[msg.sender].collateral;
-            uint256 addressIndex = governors[msg.sender].addressIndex;
+            uint16 addressIndex = governors[msg.sender].addressIndex;
             // safety check balance
             require(
                 address(this).balance >= refund,
@@ -156,57 +188,72 @@ contract Governance {
     }
 
     // ------------------------------
-    // ------ COLLATERAL VOTING -----
+    // ------- PROPOSAL VOTING ------
     // ------------------------------
 
     // add new proposal or vote on existing proposal to change the governor collateral
-    function addCollateralProposal(uint256 newCollateral) public {
+    function addProposal(ProposalType proposalType, uint256 proposalAmount)
+        public
+    {
         // address must be governor
         require(
             isValidGovernor(msg.sender),
             "Only valid governors can create proposals"
         );
         // check a vote isn't active
-        if (!collateralProposal.onVote) {
-            collateralProposal.onVote = true; // put proposal on vote, no changes until vote is setteled or removed
-            collateralProposal.proposal = newCollateral; // set new proposal for vote
-            collateralProposal.proposalHeight = block.number; // set new proposal initial height
-            delete collateralProposal.votes; // clear votes
-            collateralProposal.votes.push(msg.sender); // add sender vote
-            emit NewCollateralProposal(newCollateral); // alert listeners
-        } else if (collateralProposal.proposal == newCollateral) {
+        if (!proposal.onVote) {
+            proposal.onVote = true; // put proposal on vote, no changes until vote is setteled or removed
+            proposal.proposalAmount = proposalAmount; // set new proposal for vote
+            proposal.proposalType = proposalType; // set type of proposal vote
+            proposal.proposalHeight = block.number; // set new proposal initial height
+            delete proposal.votes; // clear votes
+            proposal.votes.push(msg.sender); // add sender vote
+            emit NewProposal(proposalType, proposalAmount); // alert listeners
+        } else if (
+            proposal.proposalAmount == proposalAmount &&
+            proposal.proposalType == proposalType
+        ) {
             require(!alreadyVoted(), "Governor has already voted"); // cannot vote twice
-            collateralProposal.votes.push(msg.sender); // add sender vote
+            proposal.votes.push(msg.sender); // add sender vote
         }
         // check if vote has expired
-        if (
-            block.number - collateralProposal.proposalHeight >
-            _proposalExpiryBlocks
-        ) {
+        if (block.number - proposal.proposalHeight > _proposalExpiryBlocks) {
             clearCollateralProposal();
         } else {
             // check if vote has passed a simple majority (51%)
-            if (collateralProposal.votes.length >= (_governorCount / 2 + 1)) {
-                // update collateral
-                _requiredCollateral = newCollateral;
+            if (proposal.votes.length >= (_governorCount / 2 + 1)) {
+                if (proposal.proposalType == ProposalType.COLLATERAL) {
+                    // update collateral
+                    _requiredCollateral = proposal.proposalAmount;
+                } else if (proposal.proposalType == ProposalType.BUDGETFEE) {
+                    // update budget listing fee
+                    _budgetProposalFee = proposal.proposalAmount;
+                }
+                // alert listeners
+                emit ProposalPassed(
+                    proposal.proposalType,
+                    proposal.proposalAmount
+                );
                 // clear proposal
                 clearCollateralProposal();
-                emit CollateralProposalPassed(_requiredCollateral); // alert listeners
             }
         }
+        // update ping time
+        governors[msg.sender].lastPing = block.number;
     }
 
     function clearCollateralProposal() private {
-        collateralProposal.proposal = 0; // clear current proposal address
-        delete collateralProposal.votes; // clear votes
-        collateralProposal.proposalHeight = 0; // clear proposal height
-        collateralProposal.onVote = false; // open submission
+        proposal.proposalAmount = 0; // clear amount
+        proposal.proposalType = ProposalType.NONE; // clear amount
+        delete proposal.votes; // clear votes
+        proposal.proposalHeight = 0; // clear proposal height
+        proposal.onVote = false; // open submission
     }
 
     function alreadyVoted() private view returns (bool voted) {
-        uint256 i;
-        for (i = 0; i < collateralProposal.votes.length; i++) {
-            if (collateralProposal.votes[i] == msg.sender) return true;
+        uint16 i;
+        for (i = 0; i < proposal.votes.length; i++) {
+            if (proposal.votes[i] == msg.sender) return true;
         }
         return false;
     }
@@ -232,7 +279,7 @@ contract Governance {
     }
 
     function selectWinner() private view returns (address winner) {
-        uint256 i;
+        uint16 i;
         for (i = 0; i < _governorCount; i++) {
             if (
                 isValidGovernor(governorAddresses[i]) &&
@@ -243,5 +290,16 @@ contract Governance {
             }
         }
         return address(0);
+    }
+
+    // ------------------------------
+    // ----------- BUDGET -----------
+    // ------------------------------
+    function budgetProposalFee() public view returns (uint256) {
+        return _budgetProposalFee;
+    }
+
+    function canVoteOnBudget(address votingAddress) public view returns (bool) {
+        return isValidGovernor(votingAddress);
     }
 }
