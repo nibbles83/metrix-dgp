@@ -129,8 +129,7 @@ contract Governance {
             "Must be a governor to unenroll"
         );
         // check blocks have passed to make a change
-        uint256 enrolledAt = governors[msg.sender].blockHeight +
-            _blocksBeforeUnenroll;
+        uint256 enrolledAt = governors[msg.sender].blockHeight.add(_blocksBeforeUnenroll);
         require(block.number > enrolledAt, "Too early to unenroll");
         uint256 refund = 0;
         if (!force && governors[msg.sender].collateral > _requiredCollateral) {
@@ -175,7 +174,7 @@ contract Governance {
     {
         // must be a mature governor
         if (
-            block.number - governors[governorAddress].blockHeight <
+            block.number.sub(governors[governorAddress].blockHeight) <
             _blockBeforeMatureGovernor
         ) {
             return false;
@@ -217,7 +216,7 @@ contract Governance {
             proposal.votes.push(msg.sender); // add sender vote
         }
         // check if vote has expired
-        if (block.number - proposal.proposalHeight > _proposalExpiryBlocks) {
+        if (block.number.sub(proposal.proposalHeight) > _proposalExpiryBlocks) {
             clearCollateralProposal();
         } else {
             // check if vote has passed a simple majority (51%)
@@ -283,7 +282,7 @@ contract Governance {
         for (i = 0; i < _governorCount; i++) {
             if (
                 isValidGovernor(governorAddresses[i]) &&
-                block.number - governors[governorAddresses[i]].lastReward >=
+                block.number.sub(governors[governorAddresses[i]].lastReward) >=
                 _rewardBlockInterval
             ) {
                 return governorAddresses[i];
