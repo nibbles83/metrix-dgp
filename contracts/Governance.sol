@@ -19,10 +19,11 @@ contract Governance {
     }
 
     uint16 private _governorCount = 0;
-    uint16 private _maximumGovernors = 2000;
-    uint256 private _requiredCollateral = 10E8;
-    uint16 private _blocksBeforeUnenroll = 10;
-    uint16 private _blockBeforeMatureGovernor = 10;
+    uint16 private _minimumGovernors = 100; // how many governors must exist before voting is enabled
+    uint16 private _maximumGovernors = 2000; // how many governors can exist
+    uint256 private _requiredCollateral = 10E8; // collateral required for governors
+    uint16 private _blocksBeforeUnenroll = 10; // blocks to pass before governor can unenroll
+    uint16 private _blockBeforeMatureGovernor = 10; // blocks to pass before governor is mature
     mapping(address => Governor) public governors;
     address[] governorAddresses;
 
@@ -44,6 +45,7 @@ contract Governance {
     // rewards
     uint16 private _rewardBlockInterval = 10;
     uint256 private _reward = 1E8;
+    uint256 private _lastRewardBlock = 0;
 
     // ------------------------------
     // ----- GOVERNANCE SYSTEM ------
@@ -68,10 +70,10 @@ contract Governance {
         // check if a governor
         require(
             governors[msg.sender].blockHeight > 0,
-            "Must be a governor to unenroll"
+            "Must be a governor to ping"
         );
         // check if governor is valid
-        require(isValidGovernor(msg.sender), "Governor is not currenlty valid");
+        require(isValidGovernor(msg.sender), "Governor is not currently valid");
         // update ping
         governors[msg.sender].lastPing = block.number;
     }
@@ -129,7 +131,9 @@ contract Governance {
             "Must be a governor to unenroll"
         );
         // check blocks have passed to make a change
-        uint256 enrolledAt = governors[msg.sender].blockHeight.add(_blocksBeforeUnenroll);
+        uint256 enrolledAt = governors[msg.sender].blockHeight.add(
+            _blocksBeforeUnenroll
+        );
         require(block.number > enrolledAt, "Too early to unenroll");
         uint256 refund = 0;
         if (!force && governors[msg.sender].collateral > _requiredCollateral) {
@@ -146,7 +150,7 @@ contract Governance {
             governors[msg.sender].lastPing = block.number;
             // send refund
             msg.sender.transfer(refund);
-            // rest last reward
+            // reset last reward
             governors[msg.sender].lastReward = 0;
         } else {
             // unenroll the governor
@@ -194,6 +198,11 @@ contract Governance {
     function addProposal(ProposalType proposalType, uint256 proposalAmount)
         public
     {
+        // must be minimum governors
+        require(
+            _governorCount >= _minimumGovernors,
+            "Not enough governors to enable voting"
+        );
         // address must be governor
         require(
             isValidGovernor(msg.sender),
@@ -268,11 +277,17 @@ contract Governance {
 
     function rewardGovernor() public payable {
         // amount must be the equal to the reward amount
-        require(msg.value == _reward, "Rewards must be exact");
+        require(msg.value <= _reward, "Reward is too high");
+        // amount must be the equal to the reward amount
+        require(
+            block.number > _lastRewardBlock,
+            "A Reward has already been paid in this block"
+        );
         // select a winner
         address winner = selectWinner();
         require(winner != address(0), "No winner could be determined");
         // pay governor
+        _lastRewardBlock = block.number;
         governors[winner].lastReward = block.number;
         address(uint160(winner)).transfer(_reward);
     }
