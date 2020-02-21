@@ -1,5 +1,5 @@
 pragma solidity ^0.4.26;
-import "SafeMath.sol";
+import "./SafeMath.sol";
 
 // Governance interface
 contract GovernanceInterface {

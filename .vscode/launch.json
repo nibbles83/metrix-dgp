@@ -17,6 +17,16 @@
             ],
             "console": "integratedTerminal",
             "internalConsoleOptions": "neverOpen"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Chain Setup",
+            "program": "${workspaceFolder}/chain-setup.js",
+            "args": [],
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
         }
     ]
 }

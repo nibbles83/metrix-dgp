@@ -18,14 +18,15 @@ contract Governance {
         uint16 addressIndex; // position in the address index array
     }
 
-    uint16 private _governorCount = 0;
+    uint16 private _governorCount = 0; // store the current number of governors
     uint16 private _minimumGovernors = 100; // how many governors must exist before voting is enabled
     uint16 private _maximumGovernors = 2000; // how many governors can exist
     uint256 private _requiredCollateral = 10E8; // collateral required for governors
     uint16 private _blocksBeforeUnenroll = 10; // blocks to pass before governor can unenroll
     uint16 private _blockBeforeMatureGovernor = 10; // blocks to pass before governor is mature
-    mapping(address => Governor) public governors;
-    address[] governorAddresses;
+    uint16 private _pingBlockInterval = 30 * 960; // maximum blocks between pings before governor can be removed for being inactive
+    mapping(address => Governor) public governors; // store governor details
+    address[] governorAddresses; // store governor address in array for looping
 
     // proposals
     enum ProposalType {NONE, COLLATERAL, BUDGETFEE}
@@ -36,14 +37,14 @@ contract Governance {
         uint256 proposalHeight;
         ProposalType proposalType;
     }
-    uint16 private _proposalExpiryBlocks = 5;
+    uint16 private _proposalExpiryBlocks = 5; // blocks for proposal to expire
     Proposal public proposal;
 
     // budget
     uint256 private _budgetProposalFee = 1E8;
 
     // rewards
-    uint16 private _rewardBlockInterval = 10;
+    uint16 private _rewardBlockInterval = 2000; // how often governors are rewarded. At minium it should be the size of _maximumGovernors
     uint256 private _reward = 1E8;
     uint256 private _lastRewardBlock = 0;
 
@@ -73,7 +74,10 @@ contract Governance {
             "Must be a governor to ping"
         );
         // check if governor is valid
-        require(isValidGovernor(msg.sender), "Governor is not currently valid");
+        require(
+            isValidGovernor(msg.sender, false),
+            "Governor is not currently valid"
+        );
         // update ping
         governors[msg.sender].lastPing = block.number;
     }
@@ -135,10 +139,11 @@ contract Governance {
             _blocksBeforeUnenroll
         );
         require(block.number > enrolledAt, "Too early to unenroll");
-        uint256 refund = 0;
         if (!force && governors[msg.sender].collateral > _requiredCollateral) {
             // if the required collateral has changed allow it to be reduce without unenrolling
-            refund = governors[msg.sender].collateral.sub(_requiredCollateral);
+            uint256 refund = governors[msg.sender].collateral.sub(
+                _requiredCollateral
+            );
             // safety check balance
             require(
                 address(this).balance >= refund,
@@ -153,25 +158,28 @@ contract Governance {
             // reset last reward
             governors[msg.sender].lastReward = 0;
         } else {
-            // unenroll the governor
-            refund = governors[msg.sender].collateral;
-            uint16 addressIndex = governors[msg.sender].addressIndex;
-            // safety check balance
-            require(
-                address(this).balance >= refund,
-                "Contract does not contain enough funds"
-            );
-            // remove governor
-            delete governors[msg.sender];
-            _governorCount--;
-            delete governorAddresses[addressIndex];
-            // refund
-            msg.sender.transfer(refund);
+            removeGovernor(msg.sender);
         }
     }
 
+    function removeGovernor(address governorAddress) private {
+        uint256 refund = governors[governorAddress].collateral;
+        uint16 addressIndex = governors[governorAddress].addressIndex;
+        // safety check balance
+        require(
+            address(this).balance >= refund,
+            "Contract does not contain enough funds"
+        );
+        // remove governor
+        delete governors[governorAddress];
+        _governorCount--;
+        delete governorAddresses[addressIndex];
+        // refund
+        address(uint160(governorAddress)).transfer(refund);
+    }
+
     // returns true if a governor exists, is mature and has the correct collateral
-    function isValidGovernor(address governorAddress)
+    function isValidGovernor(address governorAddress, bool checkPing)
         private
         view
         returns (bool valid)
@@ -185,6 +193,14 @@ contract Governance {
         }
         // must have the right collateral
         if (governors[governorAddress].collateral != _requiredCollateral) {
+            return false;
+        }
+        // must have sent a recent ping
+        if (
+            checkPing &&
+            block.number.sub(governors[governorAddress].lastPing) >
+            _pingBlockInterval
+        ) {
             return false;
         }
         return true;
@@ -205,7 +221,7 @@ contract Governance {
         );
         // address must be governor
         require(
-            isValidGovernor(msg.sender),
+            isValidGovernor(msg.sender, true),
             "Only valid governors can create proposals"
         );
         // check a vote isn't active
@@ -269,12 +285,6 @@ contract Governance {
     // ------------------------------
     // -------- REWARD SYSTEM -------
     // ------------------------------
-
-    function hasGovernorToReward() public view returns (bool) {
-        address winner = selectWinner();
-        return winner != address(0);
-    }
-
     function rewardGovernor() public payable {
         // amount must be the equal to the reward amount
         require(msg.value <= _reward, "Reward is too high");
@@ -296,7 +306,7 @@ contract Governance {
         uint16 i;
         for (i = 0; i < _governorCount; i++) {
             if (
-                isValidGovernor(governorAddresses[i]) &&
+                isValidGovernor(governorAddresses[i], true) &&
                 block.number.sub(governors[governorAddresses[i]].lastReward) >=
                 _rewardBlockInterval
             ) {
@@ -304,6 +314,19 @@ contract Governance {
             }
         }
         return address(0);
+    }
+
+    function removeInactiveGovernor() public {
+        uint16 i;
+        for (i = 0; i < _governorCount; i++) {
+            if (
+                block.number.sub(governors[governorAddresses[i]].lastPing) >
+                _pingBlockInterval
+            ) {
+                removeGovernor(governorAddresses[i]);
+                break;
+            }
+        }
     }
 
     // ------------------------------
@@ -314,6 +337,6 @@ contract Governance {
     }
 
     function canVoteOnBudget(address votingAddress) public view returns (bool) {
-        return isValidGovernor(votingAddress);
+        return isValidGovernor(votingAddress, true);
     }
 }
