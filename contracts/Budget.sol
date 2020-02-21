@@ -1,4 +1,4 @@
-pragma solidity ^0.4.26;
+pragma solidity ^0.5.15;
 import "./SafeMath.sol";
 
 // Governance interface
