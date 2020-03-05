@@ -3,7 +3,7 @@ const expect = require('chai').expect;
 const Big = require('big.js');
 const helpers = require('./helpers');
 
-let qtum, mainAddress, mainAddressHex, contract;
+let qtum, mainAddress, mainAddressHex, govContract, dgpContract, newGovernanceBudgetContract;
 
 let governorAddressList = [];
 const defaultRequiredCollateral = 10;
@@ -12,28 +12,33 @@ const reward = 1;
 
 // compile and deploy contract before tests
 before(async () => {
-    await helpers.deploy('Governance.sol');
+    let contracts = ['governanceCollateral-dgp.sol', 'DGP.sol', 'Governance.sol']
+    await helpers.deploy(contracts);
     qtum = helpers.qtum();
     mainAddress = helpers.mainAddress();
     mainAddressHex = helpers.mainAddressHex();
-    contract = helpers.contract();
+    govContract = qtum.contract('Governance.sol');
+    dgpContract = qtum.contract('DGP.sol');
+    await qtum.rawCall("generatetoaddress", [1, mainAddress]);
+    await dgpContract.send("dev_setGovernanceAddress", [govContract.address]);
+    await qtum.rawCall("generatetoaddress", [1, mainAddress]);
 })
 
-describe('Governance.sol', function () {
+describe.only('Governance.sol', function () {
     it('Should have 0 balance', async function () {
-        const result = await contract.call("balance");
+        const result = await govContract.call("balance");
         const balance = result.outputs[0].toNumber();
         expect(balance).to.equal(0);
     });
 
     it('Should have collateral of 10 MRX', async function () {
-        const result = await contract.call("requiredCollateral");
+        const result = await dgpContract.call("getGovernanceCollateral");
         const collateral = Number(Big(result.outputs[0]).div(satoshi));
         expect(collateral).to.equal(defaultRequiredCollateral);
     });
 
     it('Should enroll fail to enroll a new governor because no collateral is given', async function () {
-        const tx = await contract.send("enroll", [])
+        const tx = await govContract.send("enroll", [])
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1)
         expect(receipt.excepted).to.equal("Revert");
@@ -41,7 +46,7 @@ describe('Governance.sol', function () {
     });
 
     it('Should enroll fail to enroll a new governor because collateral is too low', async function () {
-        const tx = await contract.send("enroll", [], { amount: defaultRequiredCollateral - 1 })
+        const tx = await govContract.send("enroll", [], { amount: defaultRequiredCollateral - 1 })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1)
         expect(receipt.excepted).to.equal("Revert");
@@ -49,7 +54,7 @@ describe('Governance.sol', function () {
     });
 
     it('Should enroll fail to enroll a new governor because collateral is too high', async function () {
-        const tx = await contract.send("enroll", [], { amount: defaultRequiredCollateral - 1 })
+        const tx = await govContract.send("enroll", [], { amount: defaultRequiredCollateral - 1 })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1)
         expect(receipt.excepted).to.equal("Revert");
@@ -57,32 +62,32 @@ describe('Governance.sol', function () {
     });
 
     it('Should still have 0 balance after failed enrollment', async function () {
-        const result = await contract.call("balance");
+        const result = await govContract.call("balance");
         const balance = result.outputs[0].toNumber();
         expect(balance).to.equal(0);
     });
 
     it('Should enroll a new governor', async function () {
-        const tx = await contract.send("enroll", [], { amount: defaultRequiredCollateral })
+        const tx = await govContract.send("enroll", [], { amount: defaultRequiredCollateral, senderAddress: mainAddress })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1)
         expect(receipt.excepted).to.equal("None");
     });
 
     it('Should have 1 governors balance', async function () {
-        const result = await contract.call("balance");
+        const result = await govContract.call("balance");
         const balance = Number(Big(result.outputs[0]).div(satoshi));
         expect(balance).to.equal(defaultRequiredCollateral);
     });
 
     it('Should have 1 governor', async function () {
-        const result = await contract.call("governorCount");
+        const result = await govContract.call("governorCount");
         const count = Number(result.outputs[0]);
         expect(count).to.equal(1);
     });
 
     it('Should exist in governors list', async function () {
-        const result = await contract.call("governors", [mainAddressHex]);
+        const result = await govContract.call("governors", [mainAddressHex]);
         let blockHeight = result.outputs[0].toNumber();
         let ping = result.outputs[1].toNumber();
         let collateral = Number(Big(result.outputs[2]).div(satoshi));
@@ -94,60 +99,60 @@ describe('Governance.sol', function () {
     });
 
     it('Should fail to ping immature governor', async function () {
-        let result = await contract.rawCall("ping");
+        let result = await govContract.rawCall("ping", [], { senderAddress: mainAddress });
         expect(result.executionResult.excepted).to.equal("Revert");
         expect(result.executionResult.exceptedMessage).to.equal("Governor is not currently valid");
     });
 
     it('Should fail to add proposal due to not enough governors', async function () {
-        let result = await contract.rawCall("addProposal", [1, 15]);
+        newGovernanceBudgetContract = await helpers.deployCustomContract('governanceCollateral-dgp.sol', [['10E8', '15E8']]);
+        await qtum.rawCall("generatetoaddress", [1, mainAddress]);
+        let result = await dgpContract.rawCall("addProposal", [5, newGovernanceBudgetContract.address]);
         expect(result.executionResult.excepted).to.equal("Revert");
         expect(result.executionResult.exceptedMessage).to.equal("Not enough governors to enable voting");
     });
 
     it('Should fail to reward since reward is to high', async function () {
-        const tx = await contract.send("rewardGovernor", [], { amount: reward + 1 })
+        const tx = await govContract.send("rewardGovernor", [], { amount: reward + 1 })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
-        const receipt = await tx.confirm(1)
+        const receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("Revert");
         expect(receipt.exceptedMessage).to.equal("Reward is too high");
     });
 
-    it('Should fail to reward since no mature governor', async function () {
-        const tx = await contract.send("rewardGovernor", [], { amount: reward })
-        await qtum.rawCall("generatetoaddress", [1, mainAddress]);
-        const receipt = await tx.confirm(1)
-        expect(receipt.excepted).to.equal("Revert");
-        expect(receipt.exceptedMessage).to.equal("No winner could be determined");
+    it('Should fail to get a current winner since no mature governor', async function () {
+        const result = await govContract.call("currentWinner")
+        const winner = result.outputs[0];
+        expect(winner).to.equal("0000000000000000000000000000000000000000");
     });
 
     it('Should ping valid governor', async function () {
-        let result = await contract.call("governors", [mainAddressHex]);
+        let result = await govContract.call("governors", [mainAddressHex]);
         let startPing = result.outputs[1].toNumber();
         await qtum.rawCall("generatetoaddress", [10, mainAddress]);
-        const tx = await contract.send("ping");
+        const tx = await govContract.send("ping", [], { senderAddress: mainAddress });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1)
-        result = await contract.call("governors", [mainAddressHex]);
+        result = await govContract.call("governors", [mainAddressHex]);
         let newPing = result.outputs[1].toNumber();
         expect(startPing).to.be.lessThan(newPing);
     });
 
     it('Should reward governor', async function () {
-        const tx = await contract.send("rewardGovernor", [], { amount: reward })
+        const tx = await govContract.send("rewardGovernor", [], { amount: reward })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1)
-        const result = await contract.call("governors", [mainAddressHex]);
+        const result = await govContract.call("governors", [mainAddressHex]);
         let lastReward = result.outputs[3].toNumber();
         expect(lastReward).to.be.greaterThan(0);
     });
 
     it('Should remove an inactive governor', async function () {
-        await qtum.rawCall("generatetoaddress", [40, mainAddress]);
-        const tx = await contract.send("removeInactiveGovernor")
+        await qtum.rawCall("generatetoaddress", [41, mainAddress]);
+        const tx = await govContract.send("removeInactiveGovernor")
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1)
-        let result = await contract.call("governors", [mainAddressHex]);
+        let result = await govContract.call("governors", [mainAddressHex]);
         let blockHeight = result.outputs[0].toNumber();
         let ping = result.outputs[1].toNumber();
         let collateral = Number(Big(result.outputs[2]).div(satoshi));
@@ -161,7 +166,7 @@ describe('Governance.sol', function () {
     });
 
     it('Should enroll 2 governors', async function () {
-        let tx = await contract.send("enroll", [], { amount: defaultRequiredCollateral })
+        let tx = await govContract.send("enroll", [], { amount: defaultRequiredCollateral, senderAddress: mainAddress })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         let receipt = await tx.confirm(1);
         const addresses = await qtum.rawCall("listreceivedbyaddress");
@@ -169,7 +174,7 @@ describe('Governance.sol', function () {
         let addrIndex = 0;
         while (enrolled < 2) {
             if (addresses[addrIndex].address !== mainAddress) {
-                tx = await contract.send("enroll", [], { amount: defaultRequiredCollateral, senderAddress: addresses[addrIndex].address })
+                tx = await govContract.send("enroll", [], { amount: defaultRequiredCollateral, senderAddress: addresses[addrIndex].address })
                 await qtum.rawCall("generatetoaddress", [1, mainAddress]);
                 receipt = await tx.confirm(1);
                 expect(receipt.excepted).to.equal("None");
@@ -183,115 +188,107 @@ describe('Governance.sol', function () {
     });
 
     it('Should add proposal to change collateral', async function () {
-        let tx = await contract.send("addProposal", [1, 15 * satoshi]);
+        let tx = await dgpContract.send("addProposal", [5, newGovernanceBudgetContract.address], { senderAddress: mainAddress });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
-        result = await contract.call("proposal");
+        result = await dgpContract.call("proposal");
         const onVote = result.outputs[0];
-        const proposalAmount = Number(Big(result.outputs[1]).div(satoshi));
+        const proposalAddress = result.outputs[1];
         const proposalType = Number(result.outputs[3]);
         expect(onVote).to.equal(true);
-        expect(proposalAmount).to.equal(15);
-        expect(proposalType).to.equal(1);
+        expect(proposalAddress).to.equal(newGovernanceBudgetContract.address);
+        expect(proposalType).to.equal(5);
     });
 
     it('Should expire the active proposal', async function () {
         await qtum.rawCall("generatetoaddress", [6, mainAddress]);
-        let tx = await contract.send("addProposal", [1, 15]);
+        let tx = await dgpContract.send("addProposal", [5, newGovernanceBudgetContract.address], { senderAddress: mainAddress });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1);
-        const result = await contract.call("proposal");
+        const result = await dgpContract.call("proposal");
         const onVote = result.outputs[0];
         expect(onVote).to.equal(false);
     });
 
     it('Should pass proposal to increase collateral', async function () {
         // create proposal
-        let tx = await contract.send("addProposal", [1, 15 * satoshi]);
+        let tx = await dgpContract.send("addProposal", [5, newGovernanceBudgetContract.address], { senderAddress: mainAddress });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         let receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
-        // check double vote fails
-        tx = await contract.send("addProposal", [1, 15 * satoshi]);
-        await qtum.rawCall("generatetoaddress", [1, mainAddress]);
-        receipt = await tx.confirm(1);
-        expect(receipt.excepted).to.equal("Revert");
-        expect(receipt.exceptedMessage).to.equal("Governor has already voted");
         // add another voter
-        tx = await contract.send("addProposal", [1, 15 * satoshi], { senderAddress: governorAddressList[0] });
+        tx = await dgpContract.send("addProposal", [5, newGovernanceBudgetContract.address], { senderAddress: governorAddressList[0] });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
-        // get proposal statue
-        let result = await contract.call("proposal");
+        // get proposal status
+        let result = await dgpContract.call("proposal");
         const onVote = result.outputs[0];
         expect(onVote).to.equal(false);
         // get collateral 
-        result = await contract.call("requiredCollateral");
+        result = await dgpContract.call("getGovernanceCollateral");
         const collateral = Number(Big(result.outputs[0]).div(satoshi));
         expect(collateral).to.equal(15);
     });
 
     it('Should not have any valid governors as collateral has changed', async function () {
-        const tx = await contract.send("rewardGovernor", [], { amount: reward })
-        await qtum.rawCall("generatetoaddress", [1, mainAddress]);
-        const receipt = await tx.confirm(1)
-        expect(receipt.excepted).to.equal("Revert");
-        expect(receipt.exceptedMessage).to.equal("No winner could be determined");
+        const result = await govContract.call("currentWinner")
+        const winner = result.outputs[0];
+        expect(winner).to.equal("0000000000000000000000000000000000000000");
     });
 
     it('Should top up governors collateral', async function () {
-        const tx = await contract.send("enroll", [], { amount: 5 })
+        const tx = await govContract.send("enroll", [], { amount: 5, senderAddress: mainAddress })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1)
         expect(receipt.excepted).to.equal("None");
-        const result = await contract.call("governors", [mainAddressHex]);
+        const result = await govContract.call("governors", [mainAddressHex]);
         let collateral = Number(Big(result.outputs[2]).div(satoshi));
         expect(collateral).to.equal(15);
     });
 
     it('Should pass proposal to reduce collateral', async function () {
         // topup another governor for voting
-        let tx = await contract.send("enroll", [], { amount: 5, senderAddress: governorAddressList[0] })
+        let tx = await govContract.send("enroll", [], { amount: 5, senderAddress: governorAddressList[0] })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         let receipt = await tx.confirm(1)
         expect(receipt.excepted).to.equal("None");
         // make governors mature
         await qtum.rawCall("generatetoaddress", [10, mainAddress]);
         // create proposal
-        tx = await contract.send("addProposal", [1, defaultRequiredCollateral * satoshi]);
+        tx = await dgpContract.send("addProposal", [5, qtum.contract('governanceCollateral-dgp.sol').address], { senderAddress: mainAddress });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
         // add another voter
-        tx = await contract.send("addProposal", [1, defaultRequiredCollateral * satoshi], { senderAddress: governorAddressList[0] });
+        tx = await dgpContract.send("addProposal", [5, qtum.contract('governanceCollateral-dgp.sol').address], { senderAddress: governorAddressList[0] });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
         // get collateral 
-        result = await contract.call("requiredCollateral");
+        result = await dgpContract.call("getGovernanceCollateral");
         const collateral = Number(Big(result.outputs[0]).div(satoshi));
         expect(collateral).to.equal(defaultRequiredCollateral);
     });
 
     it('Should reduce governors collateral', async function () {
-        const tx = await contract.send("unenroll", [false])
+        const tx = await govContract.send("unenroll", [false], { senderAddress: mainAddress })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1)
         expect(receipt.excepted).to.equal("None");
-        const result = await contract.call("governors", [mainAddressHex]);
+        const result = await govContract.call("governors", [mainAddressHex]);
         let collateral = Number(Big(result.outputs[2]).div(satoshi));
         expect(collateral).to.equal(defaultRequiredCollateral);
     });
 
     it('Should unenroll governor', async function () {
-        const tx = await contract.send("unenroll", [true], { senderAddress: governorAddressList[0] })
+        const tx = await govContract.send("unenroll", [true], { senderAddress: governorAddressList[0] })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1)
         expect(receipt.excepted).to.equal("None");
         const hexAddress = await qtum.rawCall("gethexaddress", [governorAddressList[0]]);
-        const result = await contract.call("governors", [hexAddress]);
+        const result = await govContract.call("governors", [hexAddress]);
         let blockHeight = result.outputs[0].toNumber();
         let ping = result.outputs[1].toNumber();
         let collateral = result.outputs[1].toNumber();
