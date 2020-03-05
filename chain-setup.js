@@ -37,7 +37,7 @@ async function runSetup() {
     if (process.argv.indexOf("skip-premine") === -1) {
         fundingIndex = 1
         // fund main address
-        const preMineBlocks = 12;
+        const preMineBlocks = 7;
         console.log(`Mining ${preMineBlocks * 100} blocks...`);
         for (let i = 0; i < preMineBlocks; i++) {
             try {
