@@ -23,7 +23,7 @@ before(async () => {
     await qtum.rawCall("generatetoaddress", [1, mainAddress]);
 })
 
-describe.only('Governance.sol', function () {
+describe('Governance.sol', function () {
     it('Should have 0 balance', async function () {
         const result = await govContract.call("balance");
         const balance = result.outputs[0].toNumber();
@@ -221,7 +221,7 @@ describe.only('Governance.sol', function () {
         let result = await dgpContract.call("proposal");
         const onVote = result.outputs[0];
         expect(onVote).to.equal(false);
-        // get collateral 
+        // get collateral
         result = await dgpContract.call("getGovernanceCollateral");
         const collateral = Number(Big(result.outputs[0]).div(satoshi));
         expect(collateral).to.equal(15);
@@ -261,7 +261,7 @@ describe.only('Governance.sol', function () {
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
-        // get collateral 
+        // get collateral
         result = await dgpContract.call("getGovernanceCollateral");
         const collateral = Number(Big(result.outputs[0]).div(satoshi));
         expect(collateral).to.equal(defaultRequiredCollateral);
