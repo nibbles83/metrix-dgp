@@ -34,8 +34,7 @@ contract Governance {
 
     // rewards
     uint16 private _rewardBlockInterval = 2000; // how often governors are rewarded. At minimum it should be the size of _maximumGovernors
-    uint256 private _reward = 1E8;
-    uint256 private _lastRewardBlock = 0;
+    uint256 private _lastRewardBlock = 0; // only allow reward to be paid once per block
 
     // ------------------------------
     // ----- GOVERNANCE SYSTEM ------
@@ -205,19 +204,17 @@ contract Governance {
 
     function rewardGovernor() public payable {
         // amount must be the equal to the reward amount
-        require(msg.value <= _reward, "Reward is too high");
-        // amount must be the equal to the reward amount
         require(
             block.number > _lastRewardBlock,
             "A Reward has already been paid in this block"
         );
+        _lastRewardBlock = block.number;
         // select a winner
         address winner = currentWinner();
         if (winner != address(uint160(0x0))) {
             // pay governor
-            _lastRewardBlock = block.number;
             governors[winner].lastReward = block.number;
-            address(uint160(winner)).transfer(_reward);
+            address(uint160(winner)).transfer(msg.value);
         } else {
             address(uint160(0x0)).transfer(msg.value);
         }

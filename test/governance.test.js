@@ -7,8 +7,7 @@ let qtum, mainAddress, mainAddressHex, govContract, dgpContract, newGovernanceBu
 
 let governorAddressList = [];
 const defaultRequiredCollateral = 10;
-const satoshi = 1E8;
-const reward = 1;
+const satoshi = 1E8;;
 
 // compile and deploy contract before tests
 before(async () => {
@@ -112,14 +111,6 @@ describe.only('Governance.sol', function () {
         expect(result.executionResult.exceptedMessage).to.equal("Not enough governors to enable voting");
     });
 
-    it('Should fail to reward since reward is to high', async function () {
-        const tx = await govContract.send("rewardGovernor", [], { amount: reward + 1 })
-        await qtum.rawCall("generatetoaddress", [1, mainAddress]);
-        const receipt = await tx.confirm(1);
-        expect(receipt.excepted).to.equal("Revert");
-        expect(receipt.exceptedMessage).to.equal("Reward is too high");
-    });
-
     it('Should fail to get a current winner since no mature governor', async function () {
         const result = await govContract.call("currentWinner")
         const winner = result.outputs[0];
@@ -138,10 +129,14 @@ describe.only('Governance.sol', function () {
         expect(startPing).to.be.lessThan(newPing);
     });
 
-    it('Should reward governor', async function () {
-        const tx = await govContract.send("rewardGovernor", [], { amount: reward })
+    it('Should reward governor and only allow one reward per block', async function () {
+        const tx1 = await govContract.send("rewardGovernor", [], { amount: 1 })
+        const tx2 = await govContract.send("rewardGovernor", [], { amount: 1 })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
-        const receipt = await tx.confirm(1)
+        const receipt1 = await tx1.confirm(1)
+        const receipt2 = await tx2.confirm(1)
+        expect(receipt2.excepted).to.equal("Revert");
+        expect(receipt2.exceptedMessage).to.equal("A Reward has already been paid in this block");
         const result = await govContract.call("governors", [mainAddressHex]);
         let lastReward = result.outputs[3].toNumber();
         expect(lastReward).to.be.greaterThan(0);
