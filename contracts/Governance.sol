@@ -164,7 +164,16 @@ contract Governance {
         // remove governor
         delete governors[governorAddress];
         _governorCount--;
-        delete governorAddresses[addressIndex];
+        // replace item in array
+        uint16 arrayLen = uint16(governorAddresses.length);
+        if (addressIndex < arrayLen) {
+            governorAddresses[addressIndex] = governorAddresses[arrayLen - 1];
+            address updateAddr = governorAddresses[addressIndex];
+            governors[updateAddr].addressIndex = addressIndex;
+        }
+        // remove last element from array
+        delete governorAddresses[arrayLen - 1];
+        governorAddresses.length--;
         // refund
         address(uint160(governorAddress)).transfer(refund);
     }
