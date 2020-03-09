@@ -73,13 +73,17 @@ function buildContract(name, testData, customData) {
     if (name === 'Governance.sol') {
         contract = contract.replace("uint16 private _pingBlockInterval = 30 * 960;", "uint16 private _pingBlockInterval = 40;")
         contract = contract.replace("uint16 private _rewardBlockInterval = 2000;", "uint16 private _rewardBlockInterval = 100;")
+        contract = contract.replace("uint16 private _blockBeforeMatureGovernor = 15;", "uint16 private _blockBeforeMatureGovernor = 10;")
     } else if (name === 'DGP.sol') {
         contract = contract.replace("uint16 private _minimumGovernors = 100;", "uint16 private _minimumGovernors = 3;")
         contract = contract.replace("0x0000000000000000000000000000000000000087", "0x0");
     } else if (name === "Budget.sol") {
         contract = contract.replace("uint16 private _minimumGovernors = 100;", "uint16 private _minimumGovernors = 10;")
-        contract = contract.replace("uint256 private _budgetPeriod = 29219", "uint256 private _budgetPeriod = 1")
-
+        contract = contract.replace("uint256 private _budgetPeriod = 29220", "uint256 private _budgetPeriod = 1")
+    } else if (name === "governanceCollateral-dgp.sol") {
+        contract = contract.replace("25000E8", "10E8")
+    } else if (name === "budgetFee-dgp.sol") {
+        contract = contract.replace("2000E8", "1E8")
     }
     // set contract addresses if necessary
     if (testData.gasScheduleAddress) contract = contract.replace("0x0000000000000000000000000000000000000080", testData.gasScheduleAddress)

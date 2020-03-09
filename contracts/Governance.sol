@@ -26,8 +26,7 @@ contract Governance {
 
     uint16 private _governorCount = 0; // store the current number of governors
     uint16 private _maximumGovernors = 2000; // how many governors can exist
-    uint16 private _blocksBeforeUnenroll = 10; // blocks to pass before governor can unenroll
-    uint16 private _blockBeforeMatureGovernor = 10; // blocks to pass before governor is mature
+    uint16 private _blockBeforeMatureGovernor = 15; // blocks to pass before governor is mature
     uint16 private _pingBlockInterval = 30 * 960; // maximum blocks between pings before governor can be removed for being inactive
     mapping(address => Governor) public governors; // store governor details
     address[] governorAddresses; // store governor address in array for looping
@@ -127,7 +126,7 @@ contract Governance {
         uint256 requiredCollateral = getRequiredCollateral();
         // check blocks have passed to make a change
         uint256 enrolledAt = governors[msg.sender].blockHeight.add(
-            _blocksBeforeUnenroll
+            _blockBeforeMatureGovernor
         );
         require(block.number > enrolledAt, "Too early to unenroll");
         if (!force && governors[msg.sender].collateral > requiredCollateral) {

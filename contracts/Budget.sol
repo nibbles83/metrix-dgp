@@ -60,9 +60,8 @@ contract Budget {
     );
 
     // budget block details
-    uint256 private _budgetStartBlock = 10;
-    uint256 private _budgetPeriod = 29219;
-    uint256 _budgetNextSettlementBlock = _budgetStartBlock.add(_budgetPeriod);
+    uint256 private _budgetPeriod = 29220; // 365.25/12*960
+    uint256 _budgetNextSettlementBlock = _budgetPeriod;
 
     /** @dev Function to start a new proposal.
       * @param title Title of the proposal to be created
