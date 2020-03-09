@@ -13,7 +13,7 @@ before(async () => {
     dgpContract = qtum.contract('DGP.sol');
 })
 
-describe('DGP', function () {
+describe('DGP.sol', function () {
     it('Should return gas schedule from dgp contract', async function () {
         const result = await dgpContract.call("getSchedule");
         const _gasSchedule = [

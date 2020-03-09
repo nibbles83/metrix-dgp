@@ -25,7 +25,8 @@ async function deploy(contractNames) {
         blockGasLimitAddress: '',
         governanceCollateralAddress: '',
         budgetFeeAddress: '',
-        DGPAddress: ''
+        DGPAddress: '',
+        governanceAddress: ''
     }
     for (let i = 0; i < contractNames.length; i++) {
         let name = contractNames[i];
@@ -59,6 +60,7 @@ async function deploy(contractNames) {
         if (name === 'governanceCollateral-dgp.sol') testData.governanceCollateralAddress = toChecksumAddress(deployment.address)
         if (name === 'budgetFee-dgp.sol') testData.budgetFeeAddress = toChecksumAddress(deployment.address)
         if (name === 'DGP.sol') testData.DGPAddress = toChecksumAddress(deployment.address)
+        if (name === 'Governance.sol') testData.governanceAddress = toChecksumAddress(deployment.address)
     }
 
     qtum = new Qtum(rpcURL, solar);
@@ -74,6 +76,10 @@ function buildContract(name, testData, customData) {
     } else if (name === 'DGP.sol') {
         contract = contract.replace("uint16 private _minimumGovernors = 100;", "uint16 private _minimumGovernors = 3;")
         contract = contract.replace("0x0000000000000000000000000000000000000087", "0x0");
+    } else if (name === "Budget.sol") {
+        contract = contract.replace("uint16 private _minimumGovernors = 100;", "uint16 private _minimumGovernors = 10;")
+        contract = contract.replace("uint256 private _budgetPeriod = 29219", "uint256 private _budgetPeriod = 1")
+
     }
     // set contract addresses if necessary
     if (testData.gasScheduleAddress) contract = contract.replace("0x0000000000000000000000000000000000000080", testData.gasScheduleAddress)
@@ -83,7 +89,7 @@ function buildContract(name, testData, customData) {
     if (testData.governanceCollateralAddress) contract = contract.replace("0x0000000000000000000000000000000000000084", testData.governanceCollateralAddress)
     if (testData.budgetFeeAddress) contract = contract.replace("0x0000000000000000000000000000000000000085", testData.budgetFeeAddress)
     if (testData.DGPAddress) contract = contract.replace("0x0000000000000000000000000000000000000086", testData.DGPAddress)
-    if (testData.DGPAddress) contract = contract.replace("0x0000000000000000000000000000000000000086", testData.DGPAddress)
+    if (testData.governanceAddress) contract = contract.replace("0x0000000000000000000000000000000000000087", testData.governanceAddress)
     // set any custom data
     if (customData) {
         customData.forEach(item => {
@@ -116,7 +122,7 @@ function buildContract(name, testData, customData) {
 
 async function deployContract(name, contract) {
     const bytecode = contract.evm.bytecode.object;
-    let res = await qtum.rawCall("createcontract", [bytecode]);
+    let res = await qtum.rawCall("createcontract", [bytecode, 5000000]);
     // create block to confirm transaction 
     let block = await qtum.rawCall("generatetoaddress", [1, res.sender]);
     return res;

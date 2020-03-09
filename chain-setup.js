@@ -10,7 +10,7 @@ async function runSetup() {
     console.log("Running new chain setup. This process can take several minutes...");
 
     let addressList = [];
-    const addressCount = 5;
+    const addressCount = 10;
 
     if (process.argv.indexOf("skip-addresses") === -1) {
         console.log(`Generating ${addressCount} addresses...`);
