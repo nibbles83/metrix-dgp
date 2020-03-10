@@ -25,14 +25,14 @@ contract Governance {
     }
 
     uint16 private _governorCount = 0; // store the current number of governors
-    uint16 private _maximumGovernors = 2000; // how many governors can exist
+    uint16 private _maximumGovernors = 1920; // how many governors can exist
     uint16 private _blockBeforeMatureGovernor = 15; // blocks to pass before governor is mature
     uint16 private _pingBlockInterval = 30 * 960; // maximum blocks between pings before governor can be removed for being inactive
     mapping(address => Governor) public governors; // store governor details
     address[] governorAddresses; // store governor address in array for looping
 
     // rewards
-    uint16 private _rewardBlockInterval = 2000; // how often governors are rewarded. At minimum it should be the size of _maximumGovernors
+    uint16 private _rewardBlockInterval = 1920; // how often governors are rewarded. At minimum it should be the size of _maximumGovernors
     uint256 private _lastRewardBlock = 0; // only allow reward to be paid once per block
 
     // ------------------------------

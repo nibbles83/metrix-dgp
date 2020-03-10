@@ -54,7 +54,7 @@ contract DGP {
         uint256 proposalHeight;
         ProposalType proposalType;
     }
-    uint16 private _proposalExpiryBlocks = 5; // blocks for proposal to expire
+    uint16 private _proposalExpiryBlocks = 14 * 960; // blocks for proposal to expire
     Proposal public proposal; // current proposal
     uint16 private _minimumGovernors = 100; // how many governors must exist before voting is enabled
     address private _governanceAddress = address(

@@ -72,11 +72,13 @@ function buildContract(name, testData, customData) {
     // set some dev variables for Governance.sol
     if (name === 'Governance.sol') {
         contract = contract.replace("uint16 private _pingBlockInterval = 30 * 960;", "uint16 private _pingBlockInterval = 40;")
-        contract = contract.replace("uint16 private _rewardBlockInterval = 2000;", "uint16 private _rewardBlockInterval = 100;")
+        contract = contract.replace("uint16 private _rewardBlockInterval = 1920;", "uint16 private _rewardBlockInterval = 100;")
         contract = contract.replace("uint16 private _blockBeforeMatureGovernor = 15;", "uint16 private _blockBeforeMatureGovernor = 10;")
     } else if (name === 'DGP.sol') {
         contract = contract.replace("uint16 private _minimumGovernors = 100;", "uint16 private _minimumGovernors = 3;")
         contract = contract.replace("0x0000000000000000000000000000000000000087", "0x0");
+        contract = contract.replace("uint16 private _proposalExpiryBlocks = 14 * 960;", "uint16 private _proposalExpiryBlocks = 5;");
+        
     } else if (name === "Budget.sol") {
         contract = contract.replace("uint16 private _minimumGovernors = 100;", "uint16 private _minimumGovernors = 10;")
         contract = contract.replace("uint256 private _budgetPeriod = 29220", "uint256 private _budgetPeriod = 1")
