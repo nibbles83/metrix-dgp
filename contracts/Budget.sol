@@ -20,10 +20,10 @@ contract Budget {
 
     // address of the external contracts
     address private _dgpAddress = address(
-        0x0000000000000000000000000000000000000086
+        0x0000000000000000000000000000000000000087
     );
     address private _governanceAddress = address(
-        0x0000000000000000000000000000000000000087
+        0x0000000000000000000000000000000000000088
     );
 
     // Data structures
@@ -45,7 +45,7 @@ contract Budget {
     BudgetProposal[] public proposals; // List of existing proposals
     uint256 private _currentProposalId = 0; // used so each proposal can be identified for voting
     uint8 private _proposalCount = 0; // number of active proposals
-    uint8 private _maximumActiveProposals = 100; // maximum number of active proposals at any time
+    uint8 private _maximumActiveProposals = 8; // maximum number of active proposals at any time
     uint16 private _minimumGovernors = 100; // how many governors must exist before budget can be settled
 
     // Event that will be emitted whenever a new proposal is started
@@ -188,14 +188,12 @@ contract Budget {
         return address(this).balance;
     }
 
-    /** @dev Function to settle current proposals.
+    /** @dev Function to fund the budget in the coinstake as well as
+      * settle the budget in the appropraite block.
       */
-    function settleBudget() public {
+    function settleBudget() public payable {
         // must be done on correct block
-        require(
-            block.number >= _budgetNextSettlementBlock,
-            "Buget can only be settled in budget block"
-        );
+        if (block.number < _budgetNextSettlementBlock) return;
         // set new budget block
         _budgetNextSettlementBlock = block.number.add(_budgetPeriod);
         // create governance contract interface

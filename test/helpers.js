@@ -76,7 +76,7 @@ function buildContract(name, testData, customData) {
         contract = contract.replace("uint16 private _blockBeforeMatureGovernor = 15;", "uint16 private _blockBeforeMatureGovernor = 10;")
     } else if (name === 'DGP.sol') {
         contract = contract.replace("uint16 private _minimumGovernors = 100;", "uint16 private _minimumGovernors = 3;")
-        contract = contract.replace("0x0000000000000000000000000000000000000087", "0x0");
+        contract = contract.replace("0x0000000000000000000000000000000000000088", "0x0");
         contract = contract.replace("uint16 private _proposalExpiryBlocks = 14 * 960;", "uint16 private _proposalExpiryBlocks = 5;");
         
     } else if (name === "Budget.sol") {
@@ -93,9 +93,9 @@ function buildContract(name, testData, customData) {
     if (testData.minGasPriceAddress) contract = contract.replace("0x0000000000000000000000000000000000000082", testData.minGasPriceAddress)
     if (testData.blockGasLimitAddress) contract = contract.replace("0x0000000000000000000000000000000000000083", testData.blockGasLimitAddress)
     if (testData.governanceCollateralAddress) contract = contract.replace("0x0000000000000000000000000000000000000084", testData.governanceCollateralAddress)
-    if (testData.budgetFeeAddress) contract = contract.replace("0x0000000000000000000000000000000000000085", testData.budgetFeeAddress)
-    if (testData.DGPAddress) contract = contract.replace("0x0000000000000000000000000000000000000086", testData.DGPAddress)
-    if (testData.governanceAddress) contract = contract.replace("0x0000000000000000000000000000000000000087", testData.governanceAddress)
+    if (testData.budgetFeeAddress) contract = contract.replace("0x0000000000000000000000000000000000000086", testData.budgetFeeAddress)
+    if (testData.DGPAddress) contract = contract.replace("0x0000000000000000000000000000000000000087", testData.DGPAddress)
+    if (testData.governanceAddress) contract = contract.replace("0x0000000000000000000000000000000000000088", testData.governanceAddress)
     // set any custom data
     if (customData) {
         customData.forEach(item => {

@@ -130,16 +130,38 @@ describe('Governance.sol', function () {
     });
 
     it('Should reward governor and only allow one reward per block', async function () {
-        const tx1 = await govContract.send("rewardGovernor", [], { amount: 1 })
-        const tx2 = await govContract.send("rewardGovernor", [], { amount: 1 })
+        let result = await govContract.call("currentWinner")
+        const winner = result.outputs[0];
+        expect(winner).to.not.equal("0000000000000000000000000000000000000000");
+        const tx1 = await govContract.send("rewardGovernor", [winner], { amount: 1 })
+        const tx2 = await govContract.send("rewardGovernor", [winner], { amount: 1 })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
-        const receipt1 = await tx1.confirm(1)
-        const receipt2 = await tx2.confirm(1)
-        expect(receipt2.excepted).to.equal("Revert");
-        expect(receipt2.exceptedMessage).to.equal("A Reward has already been paid in this block");
-        const result = await govContract.call("governors", [mainAddressHex]);
+        const receipt1 = await tx1.confirm(1);
+        const receipt2 = await tx2.confirm(1);
+        let success = receipt1.excepted === "None" ? receipt1 : receipt2;
+        let fail = receipt1.excepted === "None" ? receipt2 : receipt1;
+        expect(success.excepted).to.equal("None");
+        expect(fail.excepted).to.equal("Revert");
+        expect(fail.exceptedMessage).to.equal("A Reward has already been paid in this block");
+        result = await govContract.call("governors", [mainAddressHex]);
         let lastReward = result.outputs[3].toNumber();
         expect(lastReward).to.be.greaterThan(0);
+    });
+
+    it('Should fail to reward invalid governor', async function () {
+        const tx = await govContract.send("rewardGovernor", ['0000000000000000000000000000000000000001'], { amount: 1 })
+        await qtum.rawCall("generatetoaddress", [1, mainAddress]);
+        const receipt = await tx.confirm(1);
+        expect(receipt.excepted).to.equal("Revert");
+        expect(receipt.exceptedMessage).to.equal("Address is not a valid governor");
+    });
+
+    it('Should fail to reward a governor too soon', async function () {
+        const tx = await govContract.send("rewardGovernor", [mainAddressHex], { amount: 1 })
+        await qtum.rawCall("generatetoaddress", [1, mainAddress]);
+        const receipt = await tx.confirm(1);
+        expect(receipt.excepted).to.equal("Revert");
+        expect(receipt.exceptedMessage).to.equal("Last reward too recent");
     });
 
     it('Should remove an inactive governor', async function () {

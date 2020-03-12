@@ -12,7 +12,7 @@ contract Governance {
 
     // dgp
     address private _dgpAddress = address(
-        0x0000000000000000000000000000000000000086
+        0x0000000000000000000000000000000000000087
     );
 
     // governors
@@ -30,6 +30,7 @@ contract Governance {
     uint16 private _pingBlockInterval = 30 * 960; // maximum blocks between pings before governor can be removed for being inactive
     mapping(address => Governor) public governors; // store governor details
     address[] governorAddresses; // store governor address in array for looping
+    uint16 _inactiveGovernorIndex = 0;
 
     // rewards
     uint16 private _rewardBlockInterval = 1920; // how often governors are rewarded. At minimum it should be the size of _maximumGovernors
@@ -210,22 +211,35 @@ contract Governance {
     // -------- REWARD SYSTEM -------
     // ------------------------------
 
-    function rewardGovernor() public payable {
+    function rewardGovernor(address winner) public payable {
         // amount must be the equal to the reward amount
         require(
             block.number > _lastRewardBlock,
             "A Reward has already been paid in this block"
         );
         _lastRewardBlock = block.number;
-        // select a winner
-        address winner = currentWinner();
         if (winner != address(uint160(0x0))) {
+            // check valid winner
+            isValidWinner(winner);
             // pay governor
             governors[winner].lastReward = block.number;
             address(uint160(winner)).transfer(msg.value);
         } else {
             address(uint160(0x0)).transfer(msg.value);
         }
+    }
+
+    function isValidWinner(address winner) private view returns (bool) {
+        require(
+            isValidGovernor(winner, true),
+            "Address is not a valid governor"
+        );
+        require(
+            block.number.sub(governors[winner].lastReward) >=
+                _rewardBlockInterval,
+            "Last reward too recent"
+        );
+        return true;
     }
 
     function currentWinner() public view returns (address winner) {
@@ -243,8 +257,14 @@ contract Governance {
     }
 
     function removeInactiveGovernor() public {
+        // check 2 governors at a time which will allow for all governors to be checked
+        // once per day and limits the gas usage for each block
         uint16 i;
-        for (i = 0; i < _governorCount; i++) {
+        for (i = _inactiveGovernorIndex; i < _inactiveGovernorIndex + 2; i++) {
+            if (i >= _governorCount) {
+                // no point continuing as we have reached the end of the list
+                break;
+            }
             if (
                 block.number.sub(governors[governorAddresses[i]].lastPing) >
                 _pingBlockInterval
@@ -252,6 +272,10 @@ contract Governance {
                 removeGovernor(governorAddresses[i]);
                 break;
             }
+        }
+        _inactiveGovernorIndex += 2;
+        if (_inactiveGovernorIndex >= _governorCount) {
+            _inactiveGovernorIndex = 0;
         }
     }
 
