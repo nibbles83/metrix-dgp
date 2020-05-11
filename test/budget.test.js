@@ -105,6 +105,11 @@ describe('Budget.sol', function () {
         expect(proposal.outputs[9].toNumber()).to.equal(0);
     });
 
+    it('Should get my vote on proposal', async function () {
+        const result = await budgetContract.call("proposalVoteStatus", [1], { senderAddress: governorAddressList[0] })
+        expect(result.outputs[0].toNumber()).to.equal(3);
+    });
+
     it('Should add funds to budget', async function () {
         const tx = await budgetContract.send("fund", [], { amount: 100 })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
@@ -154,7 +159,7 @@ describe('Budget.sol', function () {
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         let receipt = await tx.confirm(1);
         // settle
-        tx = await budgetContract.send("settleBudget",[])
+        tx = await budgetContract.send("settleBudget", [])
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         receipt = await tx.confirm(1);
         // check proposals

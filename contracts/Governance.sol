@@ -1,10 +1,12 @@
 pragma solidity 0.5.8;
 import "./SafeMath.sol";
 
+
 // interfaces
 contract DGPInterface {
     function getGovernanceCollateral() public view returns (uint256[1] memory);
 }
+
 
 contract Governance {
     // imports
@@ -49,6 +51,11 @@ contract Governance {
     function getRequiredCollateral() private view returns (uint256) {
         DGPInterface contractInterface = DGPInterface(_dgpAddress);
         return contractInterface.getGovernanceCollateral()[0];
+    }
+
+    // get list of governor addresses
+    function getGovernorsAddresses() public view returns (address[] memory) {
+        return governorAddresses;
     }
 
     // get total number of governors
@@ -278,5 +285,4 @@ contract Governance {
             _inactiveGovernorIndex = 0;
         }
     }
-
 }

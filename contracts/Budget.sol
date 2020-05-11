@@ -1,18 +1,24 @@
 pragma solidity 0.5.8;
 import "./SafeMath.sol";
 
+
 // Governance interface
 contract GovernanceInterface {
     function isValidGovernor(address governorAddress, bool checkPing)
         public
         view
         returns (bool valid);
+
     function ping() public;
+
     function governorCount() public returns (uint16);
 }
+
+
 contract DGPInterface {
     function getBudgetFee() public view returns (uint256[1] memory);
 }
+
 
 contract Budget {
     // imports
@@ -64,12 +70,12 @@ contract Budget {
     uint256 _budgetNextSettlementBlock = _budgetPeriod;
 
     /** @dev Function to start a new proposal.
-      * @param title Title of the proposal to be created
-      * @param description Brief description about the proposal
-      * @param url Url for the project
-      * @param requested Amount being requested in satoshis
-      * @param duration Duration of the payments in months
-      */
+     * @param title Title of the proposal to be created
+     * @param description Brief description about the proposal
+     * @param url Url for the project
+     * @param requested Amount being requested in satoshis
+     * @param duration Duration of the payments in months
+     */
     function startProposal(
         string memory title,
         string memory description,
@@ -128,9 +134,9 @@ contract Budget {
     }
 
     /** @dev Function to vote on a proposal.
-      * @param proposalId Id of the proposal being voted on
-      * @param vote the vote being cast (no, yes, abstain)
-      */
+     * @param proposalId Id of the proposal being voted on
+     * @param vote the vote being cast (no, yes, abstain)
+     */
     function voteForProposal(uint256 proposalId, Vote vote) public {
         GovernanceInterface governanceInterface = GovernanceInterface(
             _governanceAddress
@@ -166,8 +172,8 @@ contract Budget {
     }
 
     /** @dev Function to get a proposal by it's id.
-      * @param proposalId Id of the proposal
-      */
+     * @param proposalId Id of the proposal
+     */
     function getProposalIndex(uint256 proposalId) public view returns (int16) {
         uint8 i;
         for (i = 0; i < proposals.length; i++) {
@@ -177,20 +183,20 @@ contract Budget {
     }
 
     /** @dev Function to fund contract.
-      * These funds are paid in each new block and can also be donated to.
-      * Any unused funds will be destroyed
-      */
+     * These funds are paid in each new block and can also be donated to.
+     * Any unused funds will be destroyed
+     */
     function fund() public payable {}
 
     /** @dev Function to return current contract funds.
-      */
+     */
     function balance() public view returns (uint256) {
         return address(this).balance;
     }
 
     /** @dev Function to fund the budget in the coinstake as well as
-      * settle the budget in the appropraite block.
-      */
+     * settle the budget in the appropraite block.
+     */
     function settleBudget() public payable {
         // must be done on correct block
         if (block.number < _budgetNextSettlementBlock) return;
@@ -260,9 +266,18 @@ contract Budget {
     }
 
     /** @dev Function to return number of active proposals.
-      */
+     */
     function proposalCount() public view returns (uint8) {
         return _proposalCount;
     }
 
+    /** @dev Function to return number of active proposals.
+     * @param proposalId Id of the proposal being voted on
+     */
+    function proposalVoteStatus(uint256 proposalId) public view returns (Vote) {
+        int16 proposalRawIndex = getProposalIndex(proposalId);
+        require(proposalRawIndex >= 0, "Proposal not found");
+        uint8 proposalIndex = uint8(proposalRawIndex);
+        return proposals[proposalIndex].votes[msg.sender];
+    }
 }
