@@ -71,7 +71,7 @@ contract Governance {
         );
         // check if governor is valid
         require(
-            isValidGovernor(tx.origin, false),
+            isValidGovernor(tx.origin, false, false),
             "Governor is not currently valid"
         );
         // update ping
@@ -96,7 +96,6 @@ contract Governance {
                 "Topup collateral must be exact"
             );
             governors[msg.sender].collateral = requiredCollateral;
-            governors[msg.sender].blockHeight = block.number;
             governors[msg.sender].lastPing = block.number;
             governors[msg.sender].lastReward = 0;
         } else {
@@ -149,7 +148,6 @@ contract Governance {
             );
             // update governor
             governors[msg.sender].collateral = requiredCollateral;
-            governors[msg.sender].blockHeight = block.number;
             governors[msg.sender].lastPing = block.number;
             // send refund
             msg.sender.transfer(refund);
@@ -186,7 +184,7 @@ contract Governance {
     }
 
     // returns true if a governor exists, is mature and has the correct collateral
-    function isValidGovernor(address governorAddress, bool checkPing)
+    function isValidGovernor(address governorAddress, bool checkPing, bool checkCanVote)
         public
         view
         returns (bool valid)
@@ -208,6 +206,13 @@ contract Governance {
             checkPing &&
             block.number.sub(governors[governorAddress].lastPing) >
             _pingBlockInterval
+        ) {
+            return false;
+        }
+        // must wait 30 days to vote
+        if (
+            checkCanVote &&
+            block.number.sub(governors[governorAddress].blockHeight) < _pingBlockInterval
         ) {
             return false;
         }
@@ -238,7 +243,7 @@ contract Governance {
 
     function isValidWinner(address winner) private view returns (bool) {
         require(
-            isValidGovernor(winner, true),
+            isValidGovernor(winner, true, false),
             "Address is not a valid governor"
         );
         require(
@@ -253,7 +258,7 @@ contract Governance {
         uint16 i;
         for (i = 0; i < _governorCount; i++) {
             if (
-                isValidGovernor(governorAddresses[i], true) &&
+                isValidGovernor(governorAddresses[i], true, false) &&
                 block.number.sub(governors[governorAddresses[i]].lastReward) >=
                 _rewardBlockInterval
             ) {

@@ -4,7 +4,7 @@ import "./SafeMath.sol";
 
 // Governance interface
 contract GovernanceInterface {
-    function isValidGovernor(address governorAddress, bool checkPing)
+    function isValidGovernor(address governorAddress, bool checkPing, bool checkCanVote)
         public
         view
         returns (bool valid);
@@ -143,7 +143,7 @@ contract Budget {
         );
         // must be a valid governor
         require(
-            governanceInterface.isValidGovernor(msg.sender, true),
+            governanceInterface.isValidGovernor(msg.sender, true, true),
             "Address is not a valid governor"
         );
         // must be a valid proposal

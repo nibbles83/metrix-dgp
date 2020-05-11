@@ -67,7 +67,17 @@ describe('Budget.sol', function () {
         expect(receipt.exceptedMessage).to.equal("Address is not a valid governor");
     });
 
+    it('Should fail to vote as governor is not valid', async function () {
+        const tx = await budgetContract.send("voteForProposal", [1, 1], { senderAddress: governorAddressList[0] })
+        await qtum.rawCall("generatetoaddress", [1, mainAddress]);
+        const receipt = await tx.confirm(1);
+        expect(receipt.excepted).to.equal("Revert");
+        expect(receipt.exceptedMessage).to.equal("Address is not a valid governor");
+    });
+
     it('Should fail to vote as proposal id does not exist', async function () {
+        await govContract.send("ping", [], { senderAddress: governorAddressList[0] })
+        await qtum.rawCall("generatetoaddress", [30, mainAddress]);
         const tx = await budgetContract.send("voteForProposal", [99, 1], { senderAddress: governorAddressList[0] })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1);

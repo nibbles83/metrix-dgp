@@ -201,10 +201,12 @@ describe('Governance.sol', function () {
             addrIndex++
         }
         expect(enrolled).to.equal(2);
-        await qtum.rawCall("generatetoaddress", [10, mainAddress]);
+        await qtum.rawCall("generatetoaddress", [30, mainAddress]);
     });
 
     it('Should add proposal to change collateral', async function () {
+        await govContract.send("ping", [], { senderAddress: mainAddress });
+        await qtum.rawCall("generatetoaddress", [10, mainAddress]);
         let tx = await dgpContract.send("addProposal", [5, newGovernanceBudgetContract.address], { senderAddress: mainAddress });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1);
@@ -229,6 +231,7 @@ describe('Governance.sol', function () {
     });
 
     it('Should pass proposal to increase collateral', async function () {
+        await govContract.send("ping", [], { senderAddress: governorAddressList[0] });
         // create proposal
         let tx = await dgpContract.send("addProposal", [5, newGovernanceBudgetContract.address], { senderAddress: mainAddress });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);

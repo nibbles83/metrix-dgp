@@ -21,7 +21,7 @@ contract BudgetFeeInterface {
     function getBudgetFee() public view returns (uint256[1] memory);
 }
 contract GovernanceInterface {
-    function isValidGovernor(address governorAddress, bool checkPing)
+    function isValidGovernor(address governorAddress, bool checkPing, bool checkCanVote)
         public
         view
         returns (bool valid);
@@ -101,7 +101,7 @@ contract DGP {
         );
         // address must be governor
         require(
-            contractInterface.isValidGovernor(msg.sender, true),
+            contractInterface.isValidGovernor(msg.sender, true, true),
             "Only valid governors can create proposals"
         );
         // update ping time
