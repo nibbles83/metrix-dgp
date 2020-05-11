@@ -5,7 +5,7 @@ const fs = require('fs-extra')
 const path = require('path')
 const createKeccakHash = require('keccak')
 
-const rpcURL = "http://user:pass@localhost:13889";
+const rpcURL = "http://user:pass@localhost:33841";
 let qtum = new Qtum(rpcURL);
 let mainAddress = "";
 let mainAddressHex = "";

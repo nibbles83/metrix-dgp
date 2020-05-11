@@ -1,7 +1,7 @@
 
 const { Qtum } = require("qtumjs")
 
-const rpcURL = "http://user:pass@localhost:13889";
+const rpcURL = "http://user:pass@localhost:33841";
 let rpc = new Qtum(rpcURL);
 
 runSetup();
@@ -37,7 +37,7 @@ async function runSetup() {
     if (process.argv.indexOf("skip-premine") === -1) {
         fundingIndex = 1
         // fund main address
-        const preMineBlocks = 7;
+        const preMineBlocks = 10;
         console.log(`Mining ${preMineBlocks * 100} blocks...`);
         for (let i = 0; i < preMineBlocks; i++) {
             try {
