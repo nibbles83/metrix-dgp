@@ -10,30 +10,30 @@ Install required pacakges
 ```
 npm install
 ```
-Download Qtum client from https://github.com/qtumproject/qtum/releases and setup a qtum.conf file
+Download Metrix client from https://github.com/TheLindaProjectInc/metrix/releases and setup a metrix.conf file
 ```
 rpcuser=user
 rpcpassword=pass
 txindex=1
 logevents=1
 ```
-run qtum in regtest mode
+run metrix in regtest mode
 ```
-qtumd -regtest
+metrixd -regtest
 ```
 If it is your first time running the regtest chain you will need to generate a number of blocks to fund your account. This can take some time.
 
 Frist generate an address to fund
 ```
-qtum-cli -regtest getnewaddress
+metrix-cli -regtest getnewaddress
 ```
 the generate 1200 blocks to that address
 ```
-qtum-cli -regtest generatetoaddress 1200 "YOURADDRESS"
+metrix-cli -regtest generatetoaddress 1200 "YOURADDRESS"
 ```
 finally make sure you account has a mature balance
 ```
-qtum-cli -regtest getbalance
+metrix-cli -regtest getbalance
 ```
 if your balance is 0 generate 600 some more blocks
 
