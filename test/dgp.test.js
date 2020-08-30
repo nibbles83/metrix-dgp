@@ -8,7 +8,7 @@ let qtum, dgpContract;
 
 // compile and deploy contract before tests
 before(async () => {
-    await helpers.deploy(['gasSchedule-dgp.sol', 'blockSize-dgp.sol', 'minGasPrice-dgp.sol', 'blockGasLimit-dgp.sol', 'governanceCollateral-dgp.sol', 'budgetFee-dgp.sol', 'DGP.sol']);
+    await helpers.deploy(['gasSchedule-dgp.sol', 'blockSize-dgp.sol', 'minGasPrice-dgp.sol', 'blockGasLimit-dgp.sol', 'transactionFeeRates-dgp.sol', 'governanceCollateral-dgp.sol', 'budgetFee-dgp.sol', 'DGP.sol']);
     qtum = helpers.qtum();
     dgpContract = qtum.contract('DGP.sol');
 })
@@ -34,13 +34,24 @@ describe('DGP.sol', function () {
     it('Should return min gas price from dgp contract', async function () {
         const result = await dgpContract.call("getMinGasPrice");
         const value = result.outputs[0][0].toNumber();
-        expect(value).to.equal(1);
+        expect(value).to.equal(5000);
     });
 
     it('Should return block gas limit from dgp contract', async function () {
         const result = await dgpContract.call("getBlockGasLimit");
         const value = result.outputs[0][0].toNumber();
         expect(value).to.equal(40000000);
+    });
+
+    it('Should return transaction fee rates from dgp contract', async function () {
+        const result = await dgpContract.call("getTransactionFeeRates");
+        const _feeRates = [
+            10E8, 10E8, 30E8
+        ];
+        for (let i = 0; i < _feeRates.length; i++) {
+            const value = result.outputs[0][i].toNumber();
+            expect(value).to.equal(_feeRates[i]);
+        }
     });
 
     it('Should return governance collateral from dgp contract', async function () {

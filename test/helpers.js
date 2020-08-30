@@ -23,6 +23,7 @@ async function deploy(contractNames) {
         blockSizeAddress: '',
         minGasPriceAddress: '',
         blockGasLimitAddress: '',
+        transactionFeeRatesAddress: '',
         governanceCollateralAddress: '',
         budgetFeeAddress: '',
         DGPAddress: '',
@@ -57,6 +58,7 @@ async function deploy(contractNames) {
         if (name === 'blockSize-dgp.sol') testData.blockSizeAddress = toChecksumAddress(deployment.address)
         if (name === 'minGasPrice-dgp.sol') testData.minGasPriceAddress = toChecksumAddress(deployment.address)
         if (name === 'blockGasLimit-dgp.sol') testData.blockGasLimitAddress = toChecksumAddress(deployment.address)
+        if (name === 'transactionFeeRates-dgp.sol') testData.transactionFeeRatesAddress = toChecksumAddress(deployment.address)
         if (name === 'governanceCollateral-dgp.sol') testData.governanceCollateralAddress = toChecksumAddress(deployment.address)
         if (name === 'budgetFee-dgp.sol') testData.budgetFeeAddress = toChecksumAddress(deployment.address)
         if (name === 'DGP.sol') testData.DGPAddress = toChecksumAddress(deployment.address)
@@ -72,30 +74,32 @@ function buildContract(name, testData, customData) {
     // set some dev variables for Governance.sol
     if (name === 'Governance.sol') {
         contract = contract.replace("uint16 private _pingBlockInterval = 30 * 960;", "uint16 private _pingBlockInterval = 40;")
+        contract = contract.replace("uint16 private _blockBeforeGovernorVote = 28 * 960;", "uint16 private _blockBeforeGovernorVote = 40;")
         contract = contract.replace("uint16 private _rewardBlockInterval = 1920;", "uint16 private _rewardBlockInterval = 100;")
         contract = contract.replace("uint16 private _blockBeforeMatureGovernor = 15;", "uint16 private _blockBeforeMatureGovernor = 10;")
     } else if (name === 'DGP.sol') {
         contract = contract.replace("uint16 private _minimumGovernors = 100;", "uint16 private _minimumGovernors = 3;")
-        contract = contract.replace("0x0000000000000000000000000000000000000088", "0x0");
+        contract = contract.replace("0x0000000000000000000000000000000000000089", "0x0");
         contract = contract.replace("uint16 private _proposalExpiryBlocks = 14 * 960;", "uint16 private _proposalExpiryBlocks = 5;");
-        
+
     } else if (name === "Budget.sol") {
         contract = contract.replace("uint16 private _minimumGovernors = 100;", "uint16 private _minimumGovernors = 10;")
         contract = contract.replace("uint256 private _budgetPeriod = 29220", "uint256 private _budgetPeriod = 1")
     } else if (name === "governanceCollateral-dgp.sol") {
-        contract = contract.replace("25000E8", "10E8")
+        contract = contract.replace("7500000E8", "10E8")
     } else if (name === "budgetFee-dgp.sol") {
-        contract = contract.replace("2000E8", "1E8")
+        contract = contract.replace("600000E8", "1E8")
     }
     // set contract addresses if necessary
     if (testData.gasScheduleAddress) contract = contract.replace("0x0000000000000000000000000000000000000080", testData.gasScheduleAddress)
     if (testData.blockSizeAddress) contract = contract.replace("0x0000000000000000000000000000000000000081", testData.blockSizeAddress)
     if (testData.minGasPriceAddress) contract = contract.replace("0x0000000000000000000000000000000000000082", testData.minGasPriceAddress)
     if (testData.blockGasLimitAddress) contract = contract.replace("0x0000000000000000000000000000000000000083", testData.blockGasLimitAddress)
-    if (testData.governanceCollateralAddress) contract = contract.replace("0x0000000000000000000000000000000000000084", testData.governanceCollateralAddress)
-    if (testData.budgetFeeAddress) contract = contract.replace("0x0000000000000000000000000000000000000086", testData.budgetFeeAddress)
-    if (testData.DGPAddress) contract = contract.replace("0x0000000000000000000000000000000000000087", testData.DGPAddress)
-    if (testData.governanceAddress) contract = contract.replace("0x0000000000000000000000000000000000000088", testData.governanceAddress)
+    if (testData.transactionFeeRatesAddress) contract = contract.replace("0x0000000000000000000000000000000000000084", testData.transactionFeeRatesAddress)
+    if (testData.governanceCollateralAddress) contract = contract.replace("0x0000000000000000000000000000000000000086", testData.governanceCollateralAddress)
+    if (testData.budgetFeeAddress) contract = contract.replace("0x0000000000000000000000000000000000000087", testData.budgetFeeAddress)
+    if (testData.DGPAddress) contract = contract.replace("0x0000000000000000000000000000000000000088", testData.DGPAddress)
+    if (testData.governanceAddress) contract = contract.replace("0x0000000000000000000000000000000000000089", testData.governanceAddress)
     // set any custom data
     if (customData) {
         customData.forEach(item => {

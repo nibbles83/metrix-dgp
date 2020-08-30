@@ -19,7 +19,7 @@ before(async () => {
     govContract = qtum.contract('Governance.sol');
     budgetContract = qtum.contract('Budget.sol');
     // enroll 10 governors
-    const addresses = await qtum.rawCall("listreceivedbyaddress");
+    const addresses = await qtum.rawCall("listreceivedbyaddress", [0, true]);
     for (let i = 0; i < 10; i++) {
         let tx = await govContract.send("enroll", [], { amount: defaultRequiredCollateral, senderAddress: addresses[i].address })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
@@ -60,7 +60,7 @@ describe('Budget.sol', function () {
 
     it('Should fail to vote as is not a governor', async function () {
         const address = await qtum.rawCall("getnewaddress");
-        const tx = await budgetContract.send("voteForProposal", [1, 1], { senderAddress: address })
+        const tx = await budgetContract.send("voteForProposal", [1, Vote.ABSTAIN], { senderAddress: address })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1)
         expect(receipt.excepted).to.equal("Revert");
@@ -68,7 +68,7 @@ describe('Budget.sol', function () {
     });
 
     it('Should fail to vote as governor is not valid', async function () {
-        const tx = await budgetContract.send("voteForProposal", [1, 1], { senderAddress: governorAddressList[0] })
+        const tx = await budgetContract.send("voteForProposal", [1, Vote.ABSTAIN], { senderAddress: governorAddressList[0] })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("Revert");
@@ -78,7 +78,7 @@ describe('Budget.sol', function () {
     it('Should fail to vote as proposal id does not exist', async function () {
         await govContract.send("ping", [], { senderAddress: governorAddressList[0] })
         await qtum.rawCall("generatetoaddress", [30, mainAddress]);
-        const tx = await budgetContract.send("voteForProposal", [99, 1], { senderAddress: governorAddressList[0] })
+        const tx = await budgetContract.send("voteForProposal", [99, Vote.ABSTAIN], { senderAddress: governorAddressList[0] })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("Revert");
@@ -86,38 +86,49 @@ describe('Budget.sol', function () {
     });
 
     it('Should vote no on proposal', async function () {
-        const tx = await budgetContract.send("voteForProposal", [1, 2], { senderAddress: governorAddressList[0] })
+        const tx = await budgetContract.send("voteForProposal", [1, Vote.NO], { senderAddress: governorAddressList[0] })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
+        const vote = await budgetContract.call("proposalVoteStatus", [1], { senderAddress: governorAddressList[0] })
+        expect(vote.outputs[0].toNumber()).to.equal(Vote.NO);
         const proposal = await budgetContract.call("proposals", [0]);
         expect(proposal.outputs[8].toNumber()).to.equal(0);
         expect(proposal.outputs[9].toNumber()).to.equal(1);
     });
 
     it('Should change vote to abstain on proposal', async function () {
-        const tx = await budgetContract.send("voteForProposal", [1, 1], { senderAddress: governorAddressList[0] })
+        const tx = await budgetContract.send("voteForProposal", [1, Vote.ABSTAIN], { senderAddress: governorAddressList[0] })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
-        const proposal = await budgetContract.call("proposals", [0]);
+        const vote = await budgetContract.call("proposalVoteStatus", [1], { senderAddress: governorAddressList[0] })
+        expect(vote.outputs[0].toNumber()).to.equal(Vote.ABSTAIN);
+        const proposal = await budgetContract.call("proposals", [0]);        
         expect(proposal.outputs[8].toNumber()).to.equal(0);
         expect(proposal.outputs[9].toNumber()).to.equal(0);
     });
 
     it('Should change vote to yes on proposal', async function () {
-        const tx = await budgetContract.send("voteForProposal", [1, 3], { senderAddress: governorAddressList[0] })
+        const tx = await budgetContract.send("voteForProposal", [1, Vote.YES], { senderAddress: governorAddressList[0] })
+        await qtum.rawCall("generatetoaddress", [1, mainAddress]);
+        const receipt = await tx.confirm(1);
+        expect(receipt.excepted).to.equal("None");
+        const vote = await budgetContract.call("proposalVoteStatus", [1], { senderAddress: governorAddressList[0] })
+        expect(vote.outputs[0].toNumber()).to.equal(Vote.YES);
+        const proposal = await budgetContract.call("proposals", [0]);
+        expect(proposal.outputs[8].toNumber()).to.equal(1);
+        expect(proposal.outputs[9].toNumber()).to.equal(0);
+    });
+
+    it('Should only allow 1 vote on proposal', async function () {
+        const tx = await budgetContract.send("voteForProposal", [1, Vote.YES], { senderAddress: governorAddressList[0] })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
         const proposal = await budgetContract.call("proposals", [0]);
         expect(proposal.outputs[8].toNumber()).to.equal(1);
         expect(proposal.outputs[9].toNumber()).to.equal(0);
-    });
-
-    it('Should get my vote on proposal', async function () {
-        const result = await budgetContract.call("proposalVoteStatus", [1], { senderAddress: governorAddressList[0] })
-        expect(result.outputs[0].toNumber()).to.equal(3);
     });
 
     it('Should add funds to budget', async function () {
@@ -155,12 +166,12 @@ describe('Budget.sol', function () {
         let receipts = await Promise.all([tx1.confirm(1), tx2.confirm(1), tx3.confirm(1)]);
         // yes vote on all 3 + no vote on first
         let txs = await Promise.all([
-            budgetContract.send("voteForProposal", [2, 3], { senderAddress: governorAddressList[0] }),
-            budgetContract.send("voteForProposal", [3, 3], { senderAddress: governorAddressList[0] }),
-            budgetContract.send("voteForProposal", [4, 3], { senderAddress: governorAddressList[0] }),
-            budgetContract.send("voteForProposal", [2, 3], { senderAddress: governorAddressList[1] }),
-            budgetContract.send("voteForProposal", [3, 3], { senderAddress: governorAddressList[1] }),
-            budgetContract.send("voteForProposal", [4, 2], { senderAddress: governorAddressList[1] }),
+            budgetContract.send("voteForProposal", [2, Vote.YES], { senderAddress: governorAddressList[0] }),
+            budgetContract.send("voteForProposal", [3, Vote.YES], { senderAddress: governorAddressList[0] }),
+            budgetContract.send("voteForProposal", [4, Vote.YES], { senderAddress: governorAddressList[0] }),
+            budgetContract.send("voteForProposal", [2, Vote.YES], { senderAddress: governorAddressList[1] }),
+            budgetContract.send("voteForProposal", [3, Vote.YES], { senderAddress: governorAddressList[1] }),
+            budgetContract.send("voteForProposal", [4, Vote.NO], { senderAddress: governorAddressList[1] }),
         ])
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         receipts = await Promise.all([txs[0].confirm(1), txs[1].confirm(1), txs[2].confirm(1), txs[3].confirm(1)]);
@@ -184,3 +195,5 @@ describe('Budget.sol', function () {
     });
 
 });
+
+const Vote = { NEW: 0, ABSTAIN: 1, NO: 2, YES: 3 }

@@ -7,7 +7,7 @@ let qtum, mainAddress, mainAddressHex, govContract, dgpContract, newGovernanceBu
 
 let governorAddressList = [];
 const defaultRequiredCollateral = 10;
-const satoshi = 1E8;;
+const satoshi = 1E8;
 
 // compile and deploy contract before tests
 before(async () => {
@@ -106,7 +106,7 @@ describe('Governance.sol', function () {
     it('Should fail to add proposal due to not enough governors', async function () {
         newGovernanceBudgetContract = await helpers.deployCustomContract('governanceCollateral-dgp.sol', [['10E8', '15E8']]);
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
-        let result = await dgpContract.rawCall("addProposal", [5, newGovernanceBudgetContract.address]);
+        let result = await dgpContract.rawCall("addProposal", [ProposalType.COLLATERAL, newGovernanceBudgetContract.address]);
         expect(result.executionResult.excepted).to.equal("Revert");
         expect(result.executionResult.exceptedMessage).to.equal("Not enough governors to enable voting");
     });
@@ -186,7 +186,7 @@ describe('Governance.sol', function () {
         let tx = await govContract.send("enroll", [], { amount: defaultRequiredCollateral, senderAddress: mainAddress })
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         let receipt = await tx.confirm(1);
-        const addresses = await qtum.rawCall("listreceivedbyaddress");
+        const addresses = await qtum.rawCall("listreceivedbyaddress", [0, true]);
         let enrolled = 0;
         let addrIndex = 0;
         while (enrolled < 2) {
@@ -207,7 +207,7 @@ describe('Governance.sol', function () {
     it('Should add proposal to change collateral', async function () {
         await govContract.send("ping", [], { senderAddress: mainAddress });
         await qtum.rawCall("generatetoaddress", [10, mainAddress]);
-        let tx = await dgpContract.send("addProposal", [5, newGovernanceBudgetContract.address], { senderAddress: mainAddress });
+        let tx = await dgpContract.send("addProposal", [ProposalType.COLLATERAL, newGovernanceBudgetContract.address], { senderAddress: mainAddress });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
@@ -217,12 +217,12 @@ describe('Governance.sol', function () {
         const proposalType = Number(result.outputs[3]);
         expect(onVote).to.equal(true);
         expect(proposalAddress).to.equal(newGovernanceBudgetContract.address);
-        expect(proposalType).to.equal(5);
+        expect(proposalType).to.equal(ProposalType.COLLATERAL);
     });
 
     it('Should expire the active proposal', async function () {
         await qtum.rawCall("generatetoaddress", [6, mainAddress]);
-        let tx = await dgpContract.send("addProposal", [5, newGovernanceBudgetContract.address], { senderAddress: mainAddress });
+        let tx = await dgpContract.send("addProposal", [ProposalType.COLLATERAL, newGovernanceBudgetContract.address], { senderAddress: mainAddress });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         const receipt = await tx.confirm(1);
         const result = await dgpContract.call("proposal");
@@ -233,12 +233,12 @@ describe('Governance.sol', function () {
     it('Should pass proposal to increase collateral', async function () {
         await govContract.send("ping", [], { senderAddress: governorAddressList[0] });
         // create proposal
-        let tx = await dgpContract.send("addProposal", [5, newGovernanceBudgetContract.address], { senderAddress: mainAddress });
+        let tx = await dgpContract.send("addProposal", [ProposalType.COLLATERAL, newGovernanceBudgetContract.address], { senderAddress: mainAddress });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         let receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
         // add another voter
-        tx = await dgpContract.send("addProposal", [5, newGovernanceBudgetContract.address], { senderAddress: governorAddressList[0] });
+        tx = await dgpContract.send("addProposal", [ProposalType.COLLATERAL, newGovernanceBudgetContract.address], { senderAddress: governorAddressList[0] });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
@@ -277,12 +277,12 @@ describe('Governance.sol', function () {
         // make governors mature
         await qtum.rawCall("generatetoaddress", [10, mainAddress]);
         // create proposal
-        tx = await dgpContract.send("addProposal", [5, qtum.contract('governanceCollateral-dgp.sol').address], { senderAddress: mainAddress });
+        tx = await dgpContract.send("addProposal", [ProposalType.COLLATERAL, qtum.contract('governanceCollateral-dgp.sol').address], { senderAddress: mainAddress });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
         // add another voter
-        tx = await dgpContract.send("addProposal", [5, qtum.contract('governanceCollateral-dgp.sol').address], { senderAddress: governorAddressList[0] });
+        tx = await dgpContract.send("addProposal", [ProposalType.COLLATERAL, qtum.contract('governanceCollateral-dgp.sol').address], { senderAddress: governorAddressList[0] });
         await qtum.rawCall("generatetoaddress", [1, mainAddress]);
         receipt = await tx.confirm(1);
         expect(receipt.excepted).to.equal("None");
@@ -322,3 +322,14 @@ describe('Governance.sol', function () {
     });
 
 });
+
+const ProposalType = {
+    NONE: 0,
+    GASSCHEDULE: 1,
+    BLOCKSIZE: 2,
+    MINGASPRICE: 3,
+    BLOCKGASLIMIT: 4,
+    TRANSACTIONFEERATES: 5,
+    COLLATERAL: 6,
+    BUDGETFEE: 7
+}

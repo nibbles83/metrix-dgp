@@ -14,7 +14,7 @@ contract Governance {
 
     // dgp
     address private _dgpAddress = address(
-        0x0000000000000000000000000000000000000087
+        0x0000000000000000000000000000000000000088
     );
 
     // governors
@@ -30,6 +30,7 @@ contract Governance {
     uint16 private _maximumGovernors = 1920; // how many governors can exist
     uint16 private _blockBeforeMatureGovernor = 15; // blocks to pass before governor is mature
     uint16 private _pingBlockInterval = 30 * 960; // maximum blocks between pings before governor can be removed for being inactive
+    uint16 private _blockBeforeGovernorVote = 28 * 960; // blocks to pass before governor is allowed to vote on DGP and budget
     mapping(address => Governor) public governors; // store governor details
     address[] governorAddresses; // store governor address in array for looping
     uint16 _inactiveGovernorIndex = 0;
@@ -209,10 +210,10 @@ contract Governance {
         ) {
             return false;
         }
-        // must wait 30 days to vote
+        // must wait 28 days to vote
         if (
             checkCanVote &&
-            block.number.sub(governors[governorAddress].blockHeight) < _pingBlockInterval
+            block.number.sub(governors[governorAddress].blockHeight) < _blockBeforeGovernorVote
         ) {
             return false;
         }

@@ -26,43 +26,43 @@ contract Budget {
 
     // address of the external contracts
     address private _dgpAddress = address(
-        0x0000000000000000000000000000000000000087
+        0x0000000000000000000000000000000000000088
     );
     address private _governanceAddress = address(
-        0x0000000000000000000000000000000000000088
+        0x0000000000000000000000000000000000000089
     );
 
     // Data structures
     enum Vote {NEW, ABSTAIN, NO, YES}
     struct BudgetProposal {
-        uint256 id;
+        uint8 id;
         address owner;
         string title;
         string desc;
         string url;
         uint256 requested;
-        uint16 duration;
-        uint16 durationsPaid;
-        mapping(address => Vote) votes;
+        uint8 duration;
+        uint8 durationsPaid;
+        mapping(address => uint16) votes;
         uint16 yesVote;
         uint16 noVote;
         bool remove;
     }
     BudgetProposal[] public proposals; // List of existing proposals
-    uint256 private _currentProposalId = 0; // used so each proposal can be identified for voting
+    uint8 private _currentProposalId = 0; // used so each proposal can be identified for voting
     uint8 private _proposalCount = 0; // number of active proposals
     uint8 private _maximumActiveProposals = 8; // maximum number of active proposals at any time
     uint16 private _minimumGovernors = 100; // how many governors must exist before budget can be settled
 
     // Event that will be emitted whenever a new proposal is started
     event ProposalStarted(
-        uint256 id,
+        uint8 id,
         address owner,
         string title,
         string desc,
         string url,
         uint256 requested,
-        uint16 duration
+        uint8 duration
     );
 
     // budget block details
@@ -81,7 +81,7 @@ contract Budget {
         string memory description,
         string memory url,
         uint256 requested,
-        uint16 duration
+        uint8 duration
     ) public payable {
         DGPInterface contractInterface = DGPInterface(_dgpAddress);
         uint256 listingFee = contractInterface.getBudgetFee()[0];
@@ -95,6 +95,7 @@ contract Budget {
         // must have duration and requested amount
         require(requested > 0, "Requested amount cannot be less than 1");
         require(duration > 0, "Requested duration cannot be less than 1");
+        require(duration < 13, "Requested duration cannot be greater than 12");
         // create new proposal
         _currentProposalId++;
         _proposalCount++;
@@ -111,9 +112,8 @@ contract Budget {
         newProp.noVote = 0;
         newProp.remove = false;
         // add proposal to array
-        uint8 i;
         bool pushProposal = true;
-        for (i = 0; i < proposals.length; i++) {
+        for (uint8 i = 0; i < proposals.length; i++) {
             if (proposals[i].remove) {
                 proposals[i] = newProp;
                 pushProposal = false;
@@ -137,7 +137,7 @@ contract Budget {
      * @param proposalId Id of the proposal being voted on
      * @param vote the vote being cast (no, yes, abstain)
      */
-    function voteForProposal(uint256 proposalId, Vote vote) public {
+    function voteForProposal(uint8 proposalId, Vote vote) public {
         GovernanceInterface governanceInterface = GovernanceInterface(
             _governanceAddress
         );
@@ -150,33 +150,44 @@ contract Budget {
         int16 proposalRawIndex = getProposalIndex(proposalId);
         require(proposalRawIndex >= 0, "Proposal not found");
         uint8 proposalIndex = uint8(proposalRawIndex);
+        // create unique vote value to handle reusing memory of old budgets
+        uint16 voteData = uint16(proposalId) << 8;
+        voteData |= uint16(vote);
         // if vote was changed remove previous
-        if (
-            proposals[proposalIndex].votes[msg.sender] == Vote.YES &&
-            vote != Vote.YES
-        ) {
-            proposals[proposalIndex].yesVote--;
-        } else if (
-            proposals[proposalIndex].votes[msg.sender] == Vote.NO &&
-            vote != Vote.NO
-        ) {
-            proposals[proposalIndex].noVote--;
-        }
+        bool isNewVote = proposals[proposalIndex].votes[msg.sender] != voteData;
+        // get governor current vote
+        Vote currentVote = getVote(proposals[proposalIndex].votes[msg.sender], proposalId);
         // update vote on proposal
-        if (vote == Vote.YES) proposals[proposalIndex].yesVote++;
-        if (vote == Vote.NO) proposals[proposalIndex].noVote++;
+        if (isNewVote) {
+            if (currentVote == Vote.YES) proposals[proposalIndex].yesVote--;
+            if (currentVote == Vote.NO) proposals[proposalIndex].noVote--;
+            if (vote == Vote.YES) proposals[proposalIndex].yesVote++;
+            if (vote == Vote.NO) proposals[proposalIndex].noVote++;
+        }
         // log vote
-        proposals[proposalIndex].votes[msg.sender] = vote;
+        proposals[proposalIndex].votes[msg.sender] = voteData;
         // update governor ping
         governanceInterface.ping();
+    }
+
+    /** @dev Function to get a a governors current vote for the proposals.
+     * @param voteData vote data for the governor
+     * @param proposalId Id of the proposal
+     */
+    function getVote(uint16 voteData, uint8 proposalId) private pure returns (Vote) {
+        uint8 extractedPropId = uint8(voteData >> 8);
+        if (extractedPropId == proposalId) {
+            uint8 extractedVote = uint8(voteData);
+            return Vote(extractedVote);
+        }
+        return Vote.NEW;
     }
 
     /** @dev Function to get a proposal by it's id.
      * @param proposalId Id of the proposal
      */
-    function getProposalIndex(uint256 proposalId) public view returns (int16) {
-        uint8 i;
-        for (i = 0; i < proposals.length; i++) {
+    function getProposalIndex(uint8 proposalId) public view returns (int16) {
+        for (uint8 i = 0; i < proposals.length; i++) {
             if (proposals[i].id == proposalId && !proposals[i].remove) return i;
         }
         return -1;
@@ -274,10 +285,10 @@ contract Budget {
     /** @dev Function to return number of active proposals.
      * @param proposalId Id of the proposal being voted on
      */
-    function proposalVoteStatus(uint256 proposalId) public view returns (Vote) {
+    function proposalVoteStatus(uint8 proposalId) public view returns (Vote) {
         int16 proposalRawIndex = getProposalIndex(proposalId);
         require(proposalRawIndex >= 0, "Proposal not found");
         uint8 proposalIndex = uint8(proposalRawIndex);
-        return proposals[proposalIndex].votes[msg.sender];
+        return getVote(proposals[proposalIndex].votes[msg.sender], proposalId);
     }
 }

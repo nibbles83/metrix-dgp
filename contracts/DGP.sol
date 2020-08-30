@@ -14,6 +14,9 @@ contract MinGasPriceInterface {
 contract BlockGasLimitInterface {
     function getBlockGasLimit() public view returns (uint32[1] memory);
 }
+contract TransactionFeeRatesInterface {
+    function getTransactionFeeRates() public view returns (uint32[3] memory);
+}
 contract GovernanceCollateralInterface {
     function getGovernanceCollateral() public view returns (uint256[1] memory);
 }
@@ -21,10 +24,12 @@ contract BudgetFeeInterface {
     function getBudgetFee() public view returns (uint256[1] memory);
 }
 contract GovernanceInterface {
-    function isValidGovernor(address governorAddress, bool checkPing, bool checkCanVote)
-        public
-        view
-        returns (bool valid);
+    function isValidGovernor(
+        address governorAddress,
+        bool checkPing,
+        bool checkCanVote
+    ) public view returns (bool valid);
+
     function ping() public;
     function governorCount() public returns (uint16);
 }
@@ -44,6 +49,7 @@ contract DGP {
         BLOCKSIZE,
         MINGASPRICE,
         BLOCKGASLIMIT,
+        TRANSACTIONFEERATES,
         COLLATERAL,
         BUDGETFEE
     }
@@ -58,7 +64,7 @@ contract DGP {
     Proposal public proposal; // current proposal
     uint16 private _minimumGovernors = 100; // how many governors must exist before voting is enabled
     address private _governanceAddress = address(
-        0x0000000000000000000000000000000000000088
+        0x0000000000000000000000000000000000000089
     ); // address of governance contract
 
     // DGP
@@ -74,11 +80,14 @@ contract DGP {
     address public blockGasLimitAddress = address(
         0x0000000000000000000000000000000000000083
     );
-    address public governanceCollateralAddress = address(
+    address public transactionFeeRatesAddress = address(
         0x0000000000000000000000000000000000000084
     );
-    address public budgetFeeAddress = address(
+    address public governanceCollateralAddress = address(
         0x0000000000000000000000000000000000000086
+    );
+    address public budgetFeeAddress = address(
+        0x0000000000000000000000000000000000000087
     );
 
     // ------------------------------
@@ -160,6 +169,9 @@ contract DGP {
         } else if (proposal.proposalType == ProposalType.BLOCKGASLIMIT) {
             // update block gas limit contract address
             blockGasLimitAddress = proposal.proposalAddress;
+        } else if (proposal.proposalType == ProposalType.TRANSACTIONFEERATES) {
+            // update fee rates contract address
+            transactionFeeRatesAddress = proposal.proposalAddress;
         } else if (proposal.proposalType == ProposalType.COLLATERAL) {
             // update collateral
             governanceCollateralAddress = proposal.proposalAddress;
@@ -178,8 +190,7 @@ contract DGP {
     }
 
     function alreadyVoted() private view returns (bool voted) {
-        uint16 i;
-        for (i = 0; i < proposal.votes.length; i++) {
+        for (uint16 i = 0; i < proposal.votes.length; i++) {
             if (proposal.votes[i] == msg.sender) return true;
         }
         return false;
@@ -195,8 +206,7 @@ contract DGP {
                 proposalAddress
             );
             uint32[39] memory result = contractInterface.getSchedule();
-            uint8 i;
-            for (i = 0; i < 39; i++) {
+            for (uint8 i = 0; i < 39; i++) {
                 if (result[i] == 0) return false;
             }
             return true;
@@ -209,6 +219,15 @@ contract DGP {
         } else if (proposalType == ProposalType.BLOCKGASLIMIT) {
             BlockGasLimitInterface ci = BlockGasLimitInterface(proposalAddress);
             if (ci.getBlockGasLimit()[0] > 0) return true;
+        } else if (proposalType == ProposalType.TRANSACTIONFEERATES) {
+            TransactionFeeRatesInterface ci = TransactionFeeRatesInterface(
+                proposalAddress
+            );
+            uint32[3] memory result = ci.getTransactionFeeRates();
+            for (uint8 i = 0; i < 3; i++) {
+                if (result[i] == 0) return false;
+            }
+            return true;
         } else if (proposalType == ProposalType.COLLATERAL) {
             GovernanceCollateralInterface ci = GovernanceCollateralInterface(
                 proposalAddress
@@ -230,30 +249,42 @@ contract DGP {
         );
         return contractInterface.getSchedule();
     }
+
     function getBlockSize() public view returns (uint32[1] memory) {
         BlockSizeInterface contractInterface = BlockSizeInterface(
             blockSizeAddress
         );
         return contractInterface.getBlockSize();
     }
+
     function getMinGasPrice() public view returns (uint32[1] memory) {
         MinGasPriceInterface contractInterface = MinGasPriceInterface(
             minGasPriceAddress
         );
         return contractInterface.getMinGasPrice();
     }
+
     function getBlockGasLimit() public view returns (uint32[1] memory) {
         BlockGasLimitInterface contractInterface = BlockGasLimitInterface(
             blockGasLimitAddress
         );
         return contractInterface.getBlockGasLimit();
     }
+
+    function getTransactionFeeRates() public view returns (uint32[3] memory) {
+        TransactionFeeRatesInterface contractInterface = TransactionFeeRatesInterface(
+            transactionFeeRatesAddress
+        );
+        return contractInterface.getTransactionFeeRates();
+    }
+
     function getGovernanceCollateral() public view returns (uint256[1] memory) {
         GovernanceCollateralInterface contractInterface = GovernanceCollateralInterface(
             governanceCollateralAddress
         );
         return contractInterface.getGovernanceCollateral();
     }
+
     function getBudgetFee() public view returns (uint256[1] memory) {
         BudgetFeeInterface contractInterface = BudgetFeeInterface(
             budgetFeeAddress
