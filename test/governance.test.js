@@ -164,6 +164,14 @@ describe('Governance.sol', function () {
         expect(receipt.exceptedMessage).to.equal("Last reward too recent");
     });
 
+    it('Should fail to reward an immature governor', async function () {
+        const tx = await govContract.send("rewardGovernor", [mainAddressHex], { amount: 1 })
+        await qtum.rawCall("generatetoaddress", [1, mainAddress]);
+        const receipt = await tx.confirm(1);
+        expect(receipt.excepted).to.equal("Revert");
+        expect(receipt.exceptedMessage).to.equal("Need 1920 block maturity after enrollment");
+    });
+
     it('Should remove an inactive governor', async function () {
         await qtum.rawCall("generatetoaddress", [41, mainAddress]);
         const tx = await govContract.send("removeInactiveGovernor")

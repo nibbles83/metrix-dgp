@@ -77,6 +77,7 @@ function buildContract(name, testData, customData) {
         contract = contract.replace("uint16 private _blockBeforeGovernorVote = 28 * 960;", "uint16 private _blockBeforeGovernorVote = 40;")
         contract = contract.replace("uint16 private _rewardBlockInterval = 1920;", "uint16 private _rewardBlockInterval = 100;")
         contract = contract.replace("uint16 private _blockBeforeMatureGovernor = 15;", "uint16 private _blockBeforeMatureGovernor = 10;")
+        contract = contract.replace("uint16 private _blockBeforeMatureGovernorReward = 1920;", "uint16 private _blockBeforeMatureGovernorReward = 100;")
     } else if (name === 'DGP.sol') {
         contract = contract.replace("uint16 private _minimumGovernors = 100;", "uint16 private _minimumGovernors = 3;")
         contract = contract.replace("0x0000000000000000000000000000000000000089", "0x0");
