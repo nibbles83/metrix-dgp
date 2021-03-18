@@ -29,6 +29,7 @@ contract Governance {
     uint16 private _governorCount = 0; // store the current number of governors
     uint16 private _maximumGovernors = 1920; // how many governors can exist
     uint16 private _blockBeforeMatureGovernor = 15; // blocks to pass before governor is mature
+    uint16 private _blockBeforeMatureGovernorReward = 1920; // governor must be a minimum of 1920 blocks old to receive first reward
     uint16 private _pingBlockInterval = 30 * 960; // maximum blocks between pings before governor can be removed for being inactive
     uint16 private _blockBeforeGovernorVote = 28 * 960; // blocks to pass before governor is allowed to vote on DGP and budget
     mapping(address => Governor) public governors; // store governor details
@@ -252,6 +253,11 @@ contract Governance {
                 _rewardBlockInterval,
             "Last reward too recent"
         );
+        require(
+            block.number.sub(governors[winner].blockHeight) >=
+            _blockBeforeMatureGovernorReward,
+            "Need 1920 block maturity after enrollment"
+        );
         return true;
     }
 
@@ -261,7 +267,8 @@ contract Governance {
             if (
                 isValidGovernor(governorAddresses[i], true, false) &&
                 block.number.sub(governors[governorAddresses[i]].lastReward) >=
-                _rewardBlockInterval
+                _rewardBlockInterval && block.number.sub(governors[governorAddresses[i]].blockHeight) >=
+                _blockBeforeMatureGovernorReward
             ) {
                 return governorAddresses[i];
             }
